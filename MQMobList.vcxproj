@@ -73,9 +73,11 @@
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="MobListImGui.cpp" />
     <ClCompile Include="MQMobList.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="MobListImGui.h" />
     <ClInclude Include="MQMobList.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>

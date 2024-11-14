@@ -3,23 +3,177 @@
 
 #include <mq/Plugin.h>
 
+#include "MobListImGui.h"
+#include "MQMobList.h"
+#include <shared_mutex>
+
 PreSetup("MQMobList");
 PLUGIN_VERSION(0.1);
-#define PLUGIN_MSG "\ay[\agMobList\ay]\aw "
 
+std::shared_mutex spawnListMutex;
+std::vector<SPAWNINFO*> spawnList;
+std::chrono::steady_clock::time_point PulseTimer = std::chrono::steady_clock::now();
 
+namespace Filters {
+	const char* typeNames[] = { "PC", "NPC", "Untargetable", "Mount", "Pet", "Corpse", "Chest", "Trigger", "Trap",
+		"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer" };
+	int typeNameCount = 17;
+	int Filters::levelLow = 1;
+	int Filters::levelHigh = 150;
+	std::string Filters::name = "";
+	bool Filters::nameReverse = false;
+	int Filters::minDistance = 0;
+	int Filters::maxDistance = 10000;
+	bool Filters::directionArrow = false;
+	int Filters::typeSelection = 1;
+	std::string Filters::bodyType = "";
+	bool Filters::bodyReverse = false;
+	std::string Filters::raceName = "";
+	bool Filters::raceReverse = false;
+	std::string Filters::className = "";
+	bool Filters::classReverse = false;
+	bool Filters::conColor = true;
+}
 
-
+eSpawnType getSpawnTypeFromSelection(int typeSelection)
+{
+	switch (typeSelection)
+	{
+	case 0: return eSpawnType::PC;
+	case 1: return eSpawnType::NPC;
+	case 2: return eSpawnType::UNTARGETABLE;
+	case 3: return eSpawnType::MOUNT;
+	case 4: return eSpawnType::PET;
+	case 5: return eSpawnType::CORPSE;
+	case 6: return eSpawnType::CHEST;
+	case 7: return eSpawnType::TRIGGER;
+	case 8: return eSpawnType::TRAP;
+	case 9: return eSpawnType::TIMER;
+	case 10: return eSpawnType::ITEM;
+	case 11: return eSpawnType::MERCENARY;
+	case 12: return eSpawnType::AURA;
+	case 13: return eSpawnType::OBJECT;
+	case 14: return eSpawnType::BANNER;
+	case 15: return eSpawnType::CAMPFIRE;
+	case 16: return eSpawnType::FLYER;
+	default: return eSpawnType::NONE;
+	}
+}
 
 void createSpawnList()
 {
+	std::unique_lock<std::shared_mutex> writeLock(spawnListMutex);
+
+	auto setStringField = [](const std::string& src, char* dest, size_t maxLength) {
+		if (!src.empty()) {
+			std::strncpy(dest, src.c_str(), maxLength - 1); // Copy up to maxLength - 1 characters
+			dest[maxLength - 1] = '\0'; // Ensure null-termination
+		}
+		else {
+			dest[0] = '\0'; // Clear the field if the source is empty
+		}
+	};
+	spawnList.clear();
 	MQSpawnSearch SearchSpawn;
 	ClearSearchSpawn(&SearchSpawn);
 
-	SearchSpawn.SpawnType = eSpawnType::NPC;
+	SearchSpawn.SpawnType = getSpawnTypeFromSelection(Filters::typeSelection);
+	SearchSpawn.MinLevel = Filters::levelLow;
+	SearchSpawn.MaxLevel = Filters::levelHigh;
+	//SearchSpawn.Radius = Filters::maxDistance;
+	for (int i = 1; i <= CountMatchingSpawns(&SearchSpawn, pLocalPlayer, false); ++i)
+	{
+		bool addToSpawnList = true;
+		SPAWNINFO* pSpawn = NthNearestSpawn(&SearchSpawn, i, pLocalPlayer, false);
+		if (SpawnMatchesSearch(&SearchSpawn, pLocalPlayer, pSpawn))
+		{
+			// Level check
+			float dist = GetDistance3D(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
+			if (dist < Filters::minDistance || dist > Filters::maxDistance)
+			{
+				continue;
+			}
+			// Name filter check
+			if (!Filters::name.empty())
+			{
+				if (!Filters::nameReverse)
+				{
+					if (ci_find_substr(pSpawn->DisplayedName, Filters::name) == -1) // If the name is NOT found in the DisplayedName
+					{
+						addToSpawnList = false;
+					}
+				}
+				else
+				{
+					if (ci_find_substr(pSpawn->DisplayedName, Filters::name) != -1) // If the name IS found in the DisplayedName
+					{
+						addToSpawnList = false;
+					}
+				}
+			}
+			// Class type filter check
+			if (!Filters::className.empty())
+			{
+				if (!Filters::classReverse)
+				{
+					if (ci_find_substr(pSpawn->GetClassString(), Filters::className) == -1) // If the class name is NOT found in the GetClassString
+					{
+						addToSpawnList = false; 
+					}
+				}
+				else 
+				{
+					if (ci_find_substr(pSpawn->GetClassString(), Filters::className) != -1) // If the class name IS found in the GetClassString
+					{
+						addToSpawnList = false;
+					}
+				}
+			}
+			// Race filter check
+			if (!Filters::raceName.empty())
+			{
+				if (!Filters::raceReverse)
+				{
+					if (ci_find_substr(pSpawn->GetRaceString(), Filters::raceName) == -1) // If the race name is NOT found in the GetRaceString
+					{
+						addToSpawnList = false;
+					}
+				}
+				else
+				{
+					if (ci_find_substr(pSpawn->GetRaceString(), Filters::raceName) != -1) // If the race name IS found in the GetRaceString
+					{
+						addToSpawnList = false;
+					}
+				}
+			}
 
-	SPAWNINFO* pSpawn = SearchThroughSpawns(&SearchSpawn, pLocalPlayer);
-	WriteChatf(PLUGIN_MSG "SpawnName: %s SpawnID: %s", pSpawn->DisplayedName, pSpawn->SpawnID);
+			// Body filter check
+			if (!Filters::bodyType.empty())
+			{
+				if (!Filters::bodyReverse)
+				{
+					if (ci_find_substr(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType) == -1) // If the body type is NOT found
+					{
+						addToSpawnList = false;
+					}
+				}
+				else
+				{
+					if (ci_find_substr(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType) != -1) // If the body type IS found
+					{
+						addToSpawnList = false;
+					}
+				}
+			}
+
+			// If spawn passes all checks, add it to the list
+			if (addToSpawnList)
+			{
+				spawnList.emplace_back(pSpawn);
+			}
+		}
+	}
 }
 
 
@@ -38,7 +192,10 @@ void createSpawnList()
 PLUGIN_API void InitializePlugin()
 {
 	DebugSpewAlways("MQMobList::Initializing version %f", MQ2Version);
-
+	if (GetGameState() == GAMESTATE_INGAME)
+	{
+		createSpawnList();
+	}
 	// Examples:
 	// AddCommand("/mycommand", MyCommand);
 	// AddXMLFile("MQUI_MyXMLFile.xml");
@@ -61,85 +218,10 @@ PLUGIN_API void ShutdownPlugin()
 	// RemoveMQ2Data("mytlo");
 }
 
-/**
- * @fn OnCleanUI
- *
- * This is called once just before the shutdown of the UI system and each time the
- * game requests that the UI be cleaned.  Most commonly this happens when a
- * /loadskin command is issued, but it also occurs when reaching the character
- * select screen and when first entering the game.
- *
- * One purpose of this function is to allow you to destroy any custom windows that
- * you have created and cleanup any UI items that need to be removed.
- */
-PLUGIN_API void OnCleanUI()
-{
-	// DebugSpewAlways("MQMobList::OnCleanUI()");
-}
-
-/**
- * @fn OnReloadUI
- *
- * This is called once just after the UI system is loaded. Most commonly this
- * happens when a /loadskin command is issued, but it also occurs when first
- * entering the game.
- *
- * One purpose of this function is to allow you to recreate any custom windows
- * that you have setup.
- */
-PLUGIN_API void OnReloadUI()
-{
-	// DebugSpewAlways("MQMobList::OnReloadUI()");
-}
-
-/**
- * @fn OnDrawHUD
- *
- * This is called each time the Heads Up Display (HUD) is drawn.  The HUD is
- * responsible for the net status and packet loss bar.
- *
- * Note that this is not called at all if the HUD is not shown (default F11 to
- * toggle).
- *
- * Because the net status is updated frequently, it is recommended to have a
- * timer or counter at the start of this call to limit the amount of times the
- * code in this section is executed.
- */
-PLUGIN_API void OnDrawHUD()
-{
-/*
-	static std::chrono::steady_clock::time_point DrawHUDTimer = std::chrono::steady_clock::now();
-	// Run only after timer is up
-	if (std::chrono::steady_clock::now() > DrawHUDTimer)
-	{
-		// Wait half a second before running again
-		DrawHUDTimer = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
-		DebugSpewAlways("MQMobList::OnDrawHUD()");
-	}
-*/
-}
-
-/**
- * @fn SetGameState
- *
- * This is called when the GameState changes.  It is also called once after the
- * plugin is initialized.
- *
- * For a list of known GameState values, see the constants that begin with
- * GAMESTATE_.  The most commonly used of these is GAMESTATE_INGAME.
- *
- * When zoning, this is called once after @ref OnBeginZone @ref OnRemoveSpawn
- * and @ref OnRemoveGroundItem are all done and then called once again after
- * @ref OnEndZone and @ref OnAddSpawn are done but prior to @ref OnAddGroundItem
- * and @ref OnZoned
- *
- * @param GameState int - The value of GameState at the time of the call
- */
 PLUGIN_API void SetGameState(int GameState)
 {
 	// DebugSpewAlways("MQMobList::SetGameState(%d)", GameState);
 }
-
 
 /**
  * @fn OnPulse
@@ -157,56 +239,13 @@ PLUGIN_API void OnPulse()
 	if (std::chrono::steady_clock::now() > PulseTimer)
 	{
 		// Wait 5 seconds before running again
-		PulseTimer = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		PulseTimer = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
 		DebugSpewAlways("MQMobList::OnPulse()");
-		createSpawnList();
+		std::thread spawnListThread([]() {
+			createSpawnList();
+			});
+		spawnListThread.detach();
 	}
-}
-
-/**
- * @fn OnWriteChatColor
- *
- * This is called each time WriteChatColor is called (whether by MQ2Main or by any
- * plugin).  This can be considered the "when outputting text from MQ" callback.
- *
- * This ignores filters on display, so if they are needed either implement them in
- * this section or see @ref OnIncomingChat where filters are already handled.
- *
- * If CEverQuest::dsp_chat is not called, and events are required, they'll need to
- * be implemented here as well.  Otherwise, see @ref OnIncomingChat where that is
- * already handled.
- *
- * For a list of Color values, see the constants for USERCOLOR_.  The default is
- * USERCOLOR_DEFAULT.
- *
- * @param Line const char* - The line that was passed to WriteChatColor
- * @param Color int - The type of chat text this is to be sent as
- * @param Filter int - (default 0)
- */
-PLUGIN_API void OnWriteChatColor(const char* Line, int Color, int Filter)
-{
-	// DebugSpewAlways("MQMobList::OnWriteChatColor(%s, %d, %d)", Line, Color, Filter);
-}
-
-/**
- * @fn OnIncomingChat
- *
- * This is called each time a line of chat is shown.  It occurs after MQ filters
- * and chat events have been handled.  If you need to know when MQ2 has sent chat,
- * consider using @ref OnWriteChatColor instead.
- *
- * For a list of Color values, see the constants for USERCOLOR_. The default is
- * USERCOLOR_DEFAULT.
- *
- * @param Line const char* - The line of text that was shown
- * @param Color int - The type of chat text this was sent as
- *
- * @return bool - Whether to filter this chat from display
- */
-PLUGIN_API bool OnIncomingChat(const char* Line, DWORD Color)
-{
-	// DebugSpewAlways("MQMobList::OnIncomingChat(%s, %d)", Line, Color);
-	return false;
 }
 
 /**
@@ -310,91 +349,7 @@ PLUGIN_API void OnZoned()
 	// DebugSpewAlways("MQMobList::OnZoned()");
 }
 
-/**
- * @fn OnUpdateImGui
- *
- * This is called each time that the ImGui Overlay is rendered. Use this to render
- * and update plugin specific widgets.
- *
- * Because this happens extremely frequently, it is recommended to move any actual
- * work to a separate call and use this only for updating the display.
- */
 PLUGIN_API void OnUpdateImGui()
 {
-/*
-	if (GetGameState() == GAMESTATE_INGAME)
-	{
-		if (ShowMQMobListWindow)
-		{
-			if (ImGui::Begin("MQMobList", &ShowMQMobListWindow, ImGuiWindowFlags_MenuBar))
-			{
-				if (ImGui::BeginMenuBar())
-				{
-					ImGui::Text("MQMobList is loaded!");
-					ImGui::EndMenuBar();
-				}
-			}
-			ImGui::End();
-		}
-	}
-*/
-}
-
-/**
- * @fn OnMacroStart
- *
- * This is called each time a macro starts (ex: /mac somemacro.mac), prior to
- * launching the macro.
- *
- * @param Name const char* - The name of the macro that was launched
- */
-PLUGIN_API void OnMacroStart(const char* Name)
-{
-	// DebugSpewAlways("MQMobList::OnMacroStart(%s)", Name);
-}
-
-/**
- * @fn OnMacroStop
- *
- * This is called each time a macro stops (ex: /endmac), after the macro has ended.
- *
- * @param Name const char* - The name of the macro that was stopped.
- */
-PLUGIN_API void OnMacroStop(const char* Name)
-{
-	// DebugSpewAlways("MQMobList::OnMacroStop(%s)", Name);
-}
-
-/**
- * @fn OnLoadPlugin
- *
- * This is called each time a plugin is loaded (ex: /plugin someplugin), after the
- * plugin has been loaded and any associated -AutoExec.cfg file has been launched.
- * This means it will be executed after the plugin's @ref InitializePlugin callback.
- *
- * This is also called when THIS plugin is loaded, but initialization tasks should
- * still be done in @ref InitializePlugin.
- *
- * @param Name const char* - The name of the plugin that was loaded
- */
-PLUGIN_API void OnLoadPlugin(const char* Name)
-{
-	// DebugSpewAlways("MQMobList::OnLoadPlugin(%s)", Name);
-}
-
-/**
- * @fn OnUnloadPlugin
- *
- * This is called each time a plugin is unloaded (ex: /plugin someplugin unload),
- * just prior to the plugin unloading.  This means it will be executed prior to that
- * plugin's @ref ShutdownPlugin callback.
- *
- * This is also called when THIS plugin is unloaded, but shutdown tasks should still
- * be done in @ref ShutdownPlugin.
- *
- * @param Name const char* - The name of the plugin that is to be unloaded
- */
-PLUGIN_API void OnUnloadPlugin(const char* Name)
-{
-	// DebugSpewAlways("MQMobList::OnUnloadPlugin(%s)", Name);
+	MobListImGui::drawMobList(spawnList);
 }
