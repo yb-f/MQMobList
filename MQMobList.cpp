@@ -10,29 +10,52 @@
 PreSetup("MQMobList");
 PLUGIN_VERSION(0.1);
 
-std::shared_mutex spawnListMutex;
 std::vector<SPAWNINFO*> spawnList;
+
 std::chrono::steady_clock::time_point PulseTimer = std::chrono::steady_clock::now();
 
-namespace Filters {
+
+const char* Filters::typeNames[] = {
+	"PC", "NPC", "Untargetable", "Mount", "Pet", "Corpse", "Chest", "Trigger", "Trap",
+	"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer"
+};
+int Filters::typeNameCount = 17;
+int Filters::levelLow = 1;
+int Filters::levelHigh = 150;
+std::string Filters::name = "";
+bool Filters::nameReverse = false;
+int Filters::minDistance = 0;
+int Filters::maxDistance = 10000;
+int Filters::typeSelection = 1;
+std::string Filters::bodyType = "";
+bool Filters::bodyReverse = false;
+std::string Filters::raceName = "";
+bool Filters::raceReverse = false;
+std::string Filters::className = "";
+bool Filters::classReverse = false;
+bool Filters::conColor = false;
+bool Filters::directionArrow = false;
+
+void Filters::initFilters()
+{
 	const char* typeNames[] = { "PC", "NPC", "Untargetable", "Mount", "Pet", "Corpse", "Chest", "Trigger", "Trap",
-		"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer" };
-	int typeNameCount = 17;
-	int Filters::levelLow = 1;
-	int Filters::levelHigh = 150;
-	std::string Filters::name = "";
-	bool Filters::nameReverse = false;
-	int Filters::minDistance = 0;
-	int Filters::maxDistance = 10000;
-	bool Filters::directionArrow = false;
-	int Filters::typeSelection = 1;
-	std::string Filters::bodyType = "";
-	bool Filters::bodyReverse = false;
-	std::string Filters::raceName = "";
-	bool Filters::raceReverse = false;
-	std::string Filters::className = "";
-	bool Filters::classReverse = false;
-	bool Filters::conColor = true;
+	"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer" };
+	int typeNameCount     = 17;
+	int levelLow          = 1;
+	int levelHigh         = 150;
+	std::string name      = "";
+	bool nameReverse      = false;
+	int minDistance       = 0;
+	int maxDistance       = 10000;
+	int typeSelection     = 1;
+	std::string bodyType  = "";
+	bool bodyReverse      = false;
+	std::string raceName  = "";
+	bool raceReverse      = false;
+	std::string className = "";
+	bool classReverse     = false;
+	bool conColor         = false;
+	bool directionArrow   = false;
 }
 
 eSpawnType getSpawnTypeFromSelection(int typeSelection)
@@ -60,135 +83,105 @@ eSpawnType getSpawnTypeFromSelection(int typeSelection)
 	}
 }
 
+bool matchFilter(const std::string& value, const std::string& filter, bool reverseFilter)
+{
+	if (filter.empty()) return true;
+	bool isMatch = (ci_find_substr(value, filter) != -1);
+
+	return reverseFilter ? !isMatch : isMatch;
+}
+
+bool matchAllFilters(SPAWNINFO* pSpawn)
+{
+	float dist = GetDistance3D(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
+	if (dist < Filters::minDistance || dist > Filters::maxDistance)
+	{
+		//fail distance check
+		return false;
+	}
+	if (!Filters::name.empty() && !matchFilter(pSpawn->DisplayedName, Filters::name, Filters::nameReverse))
+	{
+		return false;
+	}
+
+	if (!Filters::className.empty() && !matchFilter(pSpawn->GetClassString(), Filters::className, Filters::classReverse))
+	{
+		return false;
+	}
+
+	if (!Filters::raceName.empty() && !matchFilter(pSpawn->GetRaceString(), Filters::raceName, Filters::raceReverse))
+	{
+		return false;
+	}
+
+	if (!Filters::bodyType.empty() && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType, Filters::bodyReverse))
+	{
+		return false;
+	}
+	return true;
+}
+
 void createSpawnList()
 {
-	std::unique_lock<std::shared_mutex> writeLock(spawnListMutex);
-
-	auto setStringField = [](const std::string& src, char* dest, size_t maxLength) {
-		if (!src.empty()) {
-			std::strncpy(dest, src.c_str(), maxLength - 1); // Copy up to maxLength - 1 characters
-			dest[maxLength - 1] = '\0'; // Ensure null-termination
-		}
-		else {
-			dest[0] = '\0'; // Clear the field if the source is empty
-		}
-	};
+	
 	spawnList.clear();
+	SPAWNINFO* pSpawn = pSpawnList;
 	MQSpawnSearch SearchSpawn;
 	ClearSearchSpawn(&SearchSpawn);
-
 	SearchSpawn.SpawnType = getSpawnTypeFromSelection(Filters::typeSelection);
 	SearchSpawn.MinLevel = Filters::levelLow;
 	SearchSpawn.MaxLevel = Filters::levelHigh;
-	//SearchSpawn.Radius = Filters::maxDistance;
-	for (int i = 1; i <= CountMatchingSpawns(&SearchSpawn, pLocalPlayer, false); ++i)
+	while (pSpawn)
 	{
-		bool addToSpawnList = true;
-		SPAWNINFO* pSpawn = NthNearestSpawn(&SearchSpawn, i, pLocalPlayer, false);
 		if (SpawnMatchesSearch(&SearchSpawn, pLocalPlayer, pSpawn))
 		{
-			// Level check
-			float dist = GetDistance3D(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
-			if (dist < Filters::minDistance || dist > Filters::maxDistance)
-			{
-				continue;
-			}
-			// Name filter check
-			if (!Filters::name.empty())
-			{
-				if (!Filters::nameReverse)
-				{
-					if (ci_find_substr(pSpawn->DisplayedName, Filters::name) == -1) // If the name is NOT found in the DisplayedName
-					{
-						addToSpawnList = false;
-					}
-				}
-				else
-				{
-					if (ci_find_substr(pSpawn->DisplayedName, Filters::name) != -1) // If the name IS found in the DisplayedName
-					{
-						addToSpawnList = false;
-					}
-				}
-			}
-			// Class type filter check
-			if (!Filters::className.empty())
-			{
-				if (!Filters::classReverse)
-				{
-					if (ci_find_substr(pSpawn->GetClassString(), Filters::className) == -1) // If the class name is NOT found in the GetClassString
-					{
-						addToSpawnList = false; 
-					}
-				}
-				else 
-				{
-					if (ci_find_substr(pSpawn->GetClassString(), Filters::className) != -1) // If the class name IS found in the GetClassString
-					{
-						addToSpawnList = false;
-					}
-				}
-			}
-			// Race filter check
-			if (!Filters::raceName.empty())
-			{
-				if (!Filters::raceReverse)
-				{
-					if (ci_find_substr(pSpawn->GetRaceString(), Filters::raceName) == -1) // If the race name is NOT found in the GetRaceString
-					{
-						addToSpawnList = false;
-					}
-				}
-				else
-				{
-					if (ci_find_substr(pSpawn->GetRaceString(), Filters::raceName) != -1) // If the race name IS found in the GetRaceString
-					{
-						addToSpawnList = false;
-					}
-				}
-			}
-
-			// Body filter check
-			if (!Filters::bodyType.empty())
-			{
-				if (!Filters::bodyReverse)
-				{
-					if (ci_find_substr(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType) == -1) // If the body type is NOT found
-					{
-						addToSpawnList = false;
-					}
-				}
-				else
-				{
-					if (ci_find_substr(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType) != -1) // If the body type IS found
-					{
-						addToSpawnList = false;
-					}
-				}
-			}
-
-			// If spawn passes all checks, add it to the list
-			if (addToSpawnList)
+			if (matchAllFilters(pSpawn))
 			{
 				spawnList.emplace_back(pSpawn);
 			}
 		}
+		pSpawn = pSpawn->pNext;
 	}
 }
 
+void mlCmd(PlayerClient* pChar, const char* szLine) {
+	char arg[MAX_STRING] = {};
+	GetMaybeQuotedArg(arg, MAX_STRING, szLine, 1);
+	if (strlen(arg))
+	{
+		if (ci_equals(arg, "help"))
+		{
+			WriteChatf(PLUGIN_MSG "\ar/ml show	\ag--- Show UI");
+			WriteChatf(PLUGIN_MSG "\ar/ml hide	\ag--- Hide UI");
+			WriteChatf(PLUGIN_MSG "\r/ml reset	\ag--- Reset all filters");
+			WriteChatf(PLUGIN_MSG "\r/ml help	\ag--- Show this help message");
+			return;
+		}
+		if (ci_equals(arg, "show"))
+		{
+			showMobListWindow = true;
+			return;
+		}
+		if (ci_equals(arg, "hide"))
+		{
+			showMobListWindow = false;
+			return;
+		}
+		if (ci_equals(arg, "reset"))
+		{
+			Filters::initFilters();
+			return;
+		}
+	}
+	else
+	{
+		WriteChatf(PLUGIN_MSG "\ar/ml show	\ag--- Show UI");
+		WriteChatf(PLUGIN_MSG "\ar/ml hide	\ag--- Hide UI");
+		WriteChatf(PLUGIN_MSG "\r/ml reset	\ag--- Reset all filters");
+		WriteChatf(PLUGIN_MSG "\r/ml help	\ag--- Show this help message");
+	}
+}
 
-/**
- * Avoid Globals if at all possible, since they persist throughout your program.
- * But if you must have them, here is the place to put them.
- */
-// bool ShowMQMobListWindow = true;
-
-/**
- * @fn InitializePlugin
- *
- * This is called once on plugin initialization and can be considered the startup
- * routine for the plugin.
- */
 PLUGIN_API void InitializePlugin()
 {
 	DebugSpewAlways("MQMobList::Initializing version %f", MQ2Version);
@@ -197,159 +190,37 @@ PLUGIN_API void InitializePlugin()
 		createSpawnList();
 	}
 	// Examples:
-	// AddCommand("/mycommand", MyCommand);
+	AddCommand("/ml", mlCmd);
 	// AddXMLFile("MQUI_MyXMLFile.xml");
 	// AddMQ2Data("mytlo", MyTLOData);
 }
 
-/**
- * @fn ShutdownPlugin
- *
- * This is called once when the plugin has been asked to shutdown.  The plugin has
- * not actually shut down until this completes.
- */
 PLUGIN_API void ShutdownPlugin()
 {
-	DebugSpewAlways("MQMobList::Shutting down");
-
-	// Examples:
-	// RemoveCommand("/mycommand");
+	DebugSpewAlways("MQTaskHud::Shutting down");
+	RemoveCommand("/ml");
 	// RemoveXMLFile("MQUI_MyXMLFile.xml");
 	// RemoveMQ2Data("mytlo");
 }
 
-PLUGIN_API void SetGameState(int GameState)
-{
-	// DebugSpewAlways("MQMobList::SetGameState(%d)", GameState);
-}
-
-/**
- * @fn OnPulse
- *
- * This is called each time MQ2 goes through its heartbeat (pulse) function.
- *
- * Because this happens very frequently, it is recommended to have a timer or
- * counter at the start of this call to limit the amount of times the code in
- * this section is executed.
- */
 PLUGIN_API void OnPulse()
 {
-	static std::chrono::steady_clock::time_point PulseTimer = std::chrono::steady_clock::now();
 	// Run only after timer is up
 	if (std::chrono::steady_clock::now() > PulseTimer)
 	{
 		// Wait 5 seconds before running again
-		PulseTimer = std::chrono::steady_clock::now() + std::chrono::milliseconds(2500);
-		DebugSpewAlways("MQMobList::OnPulse()");
-		std::thread spawnListThread([]() {
+		PulseTimer = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		if (GetGameState() == GAMESTATE_INGAME)
+		{
 			createSpawnList();
-			});
-		spawnListThread.detach();
+		}
 	}
-}
-
-/**
- * @fn OnAddSpawn
- *
- * This is called each time a spawn is added to a zone (ie, something spawns). It is
- * also called for each existing spawn when a plugin first initializes.
- *
- * When zoning, this is called for all spawns in the zone after @ref OnEndZone is
- * called and before @ref OnZoned is called.
- *
- * @param pNewSpawn PSPAWNINFO - The spawn that was added
- */
-PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
-{
-	// DebugSpewAlways("MQMobList::OnAddSpawn(%s)", pNewSpawn->Name);
-}
-
-/**
- * @fn OnRemoveSpawn
- *
- * This is called each time a spawn is removed from a zone (ie, something despawns
- * or is killed).  It is NOT called when a plugin shuts down.
- *
- * When zoning, this is called for all spawns in the zone after @ref OnBeginZone is
- * called.
- *
- * @param pSpawn PSPAWNINFO - The spawn that was removed
- */
-PLUGIN_API void OnRemoveSpawn(PSPAWNINFO pSpawn)
-{
-	// DebugSpewAlways("MQMobList::OnRemoveSpawn(%s)", pSpawn->Name);
-}
-
-/**
- * @fn OnAddGroundItem
- *
- * This is called each time a ground item is added to a zone (ie, something spawns).
- * It is also called for each existing ground item when a plugin first initializes.
- *
- * When zoning, this is called for all ground items in the zone after @ref OnEndZone
- * is called and before @ref OnZoned is called.
- *
- * @param pNewGroundItem PGROUNDITEM - The ground item that was added
- */
-PLUGIN_API void OnAddGroundItem(PGROUNDITEM pNewGroundItem)
-{
-	// DebugSpewAlways("MQMobList::OnAddGroundItem(%d)", pNewGroundItem->DropID);
-}
-
-/**
- * @fn OnRemoveGroundItem
- *
- * This is called each time a ground item is removed from a zone (ie, something
- * despawns or is picked up).  It is NOT called when a plugin shuts down.
- *
- * When zoning, this is called for all ground items in the zone after
- * @ref OnBeginZone is called.
- *
- * @param pGroundItem PGROUNDITEM - The ground item that was removed
- */
-PLUGIN_API void OnRemoveGroundItem(PGROUNDITEM pGroundItem)
-{
-	// DebugSpewAlways("MQMobList::OnRemoveGroundItem(%d)", pGroundItem->DropID);
-}
-
-/**
- * @fn OnBeginZone
- *
- * This is called just after entering a zone line and as the loading screen appears.
- */
-PLUGIN_API void OnBeginZone()
-{
-	// DebugSpewAlways("MQMobList::OnBeginZone()");
-}
-
-/**
- * @fn OnEndZone
- *
- * This is called just after the loading screen, but prior to the zone being fully
- * loaded.
- *
- * This should occur before @ref OnAddSpawn and @ref OnAddGroundItem are called. It
- * always occurs before @ref OnZoned is called.
- */
-PLUGIN_API void OnEndZone()
-{
-	// DebugSpewAlways("MQMobList::OnEndZone()");
-}
-
-/**
- * @fn OnZoned
- *
- * This is called after entering a new zone and the zone is considered "loaded."
- *
- * It occurs after @ref OnEndZone @ref OnAddSpawn and @ref OnAddGroundItem have
- * been called.
- */
-PLUGIN_API void OnZoned()
-{
-	// DebugSpewAlways("MQMobList::OnZoned()");
 }
 
 PLUGIN_API void OnUpdateImGui()
 {
-	MobListImGui::drawMobList(spawnList);
+	if (GetGameState() == GAMESTATE_INGAME)
+	{
+		MobListImGui::drawMobList(spawnList);
+	}
 }

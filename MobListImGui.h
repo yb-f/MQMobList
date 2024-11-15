@@ -1,8 +1,13 @@
 #pragma once
 #include "MQMobList.h"
 #include <mq/Plugin.h>
-#include "MobListImGui.h"
 #include <mq/imgui/Widgets.h>
+
+#define ARROW_WIDTH 5
+#define ARROW_HEIGHT 15
+#define ARROW_SIZE 25
+
+extern bool showMobListWindow;
 
 enum eColumnId {
 	Id,
@@ -20,18 +25,18 @@ enum eColumnId {
 class MobListImGui
 {
 public:
-	static void drawMobList(const std::vector<SPAWNINFO*>& spawnList);
-	static void drawMobListTable(const std::vector<SPAWNINFO*>& spawnList);
+	static void drawDirectionalArrow(SPAWNINFO* spawn, ImVec2 cursorPos);
+	static void drawMobRow(SPAWNINFO* spawn);
+	static void drawMobList(std::vector<SPAWNINFO*>& spawnList);
+	static void drawMobListTable(std::vector<SPAWNINFO*>& spawnList);
 	static void drawSearchHeader();
-
+	static void drawOptMenu();
 	static constexpr int FIRST_WINDOW_WIDTH = 445;
 	static constexpr int FIRST_WINDOW_HEIGHT = 490;
 
 
 	static constexpr int tableFlags = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg 
 		| ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
-
-	//static constexpr int columnFlags = (ImGuiTableColumnFlags_wid)
 };
 
 namespace ImGui {
