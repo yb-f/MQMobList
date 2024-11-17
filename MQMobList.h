@@ -1,30 +1,88 @@
 #pragma once
 
 #include <mq/Plugin.h>
-#include "MobListImGui.h"
 #define PLUGIN_MSG "\ay[\agMobList\ay]\aw "
 
+/**
+ * \brief A class for the filter criteria used in filtering the spawn list.
+ * 
+ * Members of this class are used for filtering spawns to create a list of only the desired spawns.
+ */
 class Filters {
 public:
-	static const char* typeNames[];
-	static int typeNameCount;
-	static int levelLow;
-	static int levelHigh;
-	static std::string name;
-	static bool nameReverse;
-	static int minDistance;
-	static int maxDistance;
-	static int typeSelection;
-	static std::string bodyType;
-	static bool bodyReverse;
-	static std::string raceName;
-	static bool raceReverse;
-	static std::string className;
-	static bool classReverse;
-	static bool conColor;
-	static bool directionArrow;
+	/// Values do not change during execution 
+	/// Filters by Type
+	std::vector <std::pair<const char*, eSpawnType>> spawnTypeNames = {
+			{"PC", PC},
+			{"NPC", NPC},
+			{"Untargetable", UNTARGETABLE},
+			{"Mount", MOUNT},
+			{"Pet", PET},
+			{"Corpse", CORPSE},
+			{"Chest", CHEST},
+			{"Trigger", TRIGGER},
+			{"Trap", TRAP},
+			{"Timer", TIMER},
+			{"Item", ITEM},
+			{"Mercenary", MERCENARY},
+			{"Aura", AURA},
+			{"Object", OBJECT},
+			{"Banner", BANNER},
+			{"Campfire", CAMPFIRE},
+			{"Flyer", FLYER}
+	};
+	int typeNameCount;
+	int typeSelection;
+	/// Filters by level 
+	int levelLow;
+	int levelHigh;
+	/// Filters by name
+	std::string name;
+	bool nameReverse;
+	/// Filters by distance
+	int minDistance;
+	int maxDistance;
+	/// Filters by body type
+	std::string bodyType;
+	bool bodyReverse;
+	/// Filters by race	
+	std::string raceName;
+	bool raceReverse;
+	/// Filters by class
+	std::string className;
+	bool classReverse;
+	/// UI Settings
+	bool conColor = false;
+	bool directionArrow = false;
+	bool showMobListWindow = true;
+	/// Sort triggers
+	unsigned int prevColumn = -1;
+	bool prevAscending;
+	bool refreshTriggered = false;
 
-	static void initFilters();
+	Filters() {
+		typeNameCount = spawnTypeNames.size();
+		levelLow = 1;
+		levelHigh = 150;
+		name = "";
+		nameReverse = false;
+		minDistance = 0;
+		maxDistance = 10000;
+		typeSelection = 1;
+		bodyType = "";
+		bodyReverse = false;
+		raceName = "";
+		raceReverse = false;
+		className = "";
+		classReverse = false;
+		conColor = false;
+		directionArrow = false;
+	}
+	
+	void resetFilters(Filters& filters)
+	{
+		filters = Filters();
+	}
 };
 
-extern std::chrono::steady_clock::time_point PulseTimer;
+void createSpawnList();
