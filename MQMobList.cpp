@@ -232,6 +232,12 @@ PLUGIN_API void OnZoned()
 
 PLUGIN_API void OnPulse()
 {
+	if (!filters.welcomeSent)
+	{
+		filters.welcomeSent = true;
+		WriteChatf(PLUGIN_MSG "Welcome to MQ Mob List.");
+		WriteChatf(PLUGIN_MSG "Use \ay/moblist help\aw to show help.");
+	}
 	// Run only after timer is up
 }
 
