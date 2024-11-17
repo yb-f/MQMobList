@@ -59,6 +59,7 @@ public:
 	unsigned int prevColumn = -1;
 	bool prevAscending;
 	bool refreshTriggered = false;
+	bool welcomeSent = false;
 
 	Filters() {
 		typeNameCount = spawnTypeNames.size();
