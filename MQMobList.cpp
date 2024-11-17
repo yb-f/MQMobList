@@ -1,3 +1,4 @@
+
 // MQMobList.cpp : Defines the entry point for the DLL application.
 //
 
@@ -12,173 +13,151 @@ PLUGIN_VERSION(0.1);
 
 std::vector<SPAWNINFO*> spawnList;
 
-std::chrono::steady_clock::time_point PulseTimer = std::chrono::steady_clock::now();
+Filters filters;
 
-
-const char* Filters::typeNames[] = {
-	"PC", "NPC", "Untargetable", "Mount", "Pet", "Corpse", "Chest", "Trigger", "Trap",
-	"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer"
-};
-int Filters::typeNameCount = 17;
-int Filters::levelLow = 1;
-int Filters::levelHigh = 150;
-std::string Filters::name = "";
-bool Filters::nameReverse = false;
-int Filters::minDistance = 0;
-int Filters::maxDistance = 10000;
-int Filters::typeSelection = 1;
-std::string Filters::bodyType = "";
-bool Filters::bodyReverse = false;
-std::string Filters::raceName = "";
-bool Filters::raceReverse = false;
-std::string Filters::className = "";
-bool Filters::classReverse = false;
-bool Filters::conColor = false;
-bool Filters::directionArrow = false;
-
-void Filters::initFilters()
-{
-	const char* typeNames[] = { "PC", "NPC", "Untargetable", "Mount", "Pet", "Corpse", "Chest", "Trigger", "Trap",
-	"Timer", "Item", "Mercenary", "Aura", "Object", "Banner", "Campfire", "Flyer" };
-	int typeNameCount     = 17;
-	int levelLow          = 1;
-	int levelHigh         = 150;
-	std::string name      = "";
-	bool nameReverse      = false;
-	int minDistance       = 0;
-	int maxDistance       = 10000;
-	int typeSelection     = 1;
-	std::string bodyType  = "";
-	bool bodyReverse      = false;
-	std::string raceName  = "";
-	bool raceReverse      = false;
-	std::string className = "";
-	bool classReverse     = false;
-	bool conColor         = false;
-	bool directionArrow   = false;
-}
-
-eSpawnType getSpawnTypeFromSelection(int typeSelection)
-{
-	switch (typeSelection)
-	{
-	case 0: return eSpawnType::PC;
-	case 1: return eSpawnType::NPC;
-	case 2: return eSpawnType::UNTARGETABLE;
-	case 3: return eSpawnType::MOUNT;
-	case 4: return eSpawnType::PET;
-	case 5: return eSpawnType::CORPSE;
-	case 6: return eSpawnType::CHEST;
-	case 7: return eSpawnType::TRIGGER;
-	case 8: return eSpawnType::TRAP;
-	case 9: return eSpawnType::TIMER;
-	case 10: return eSpawnType::ITEM;
-	case 11: return eSpawnType::MERCENARY;
-	case 12: return eSpawnType::AURA;
-	case 13: return eSpawnType::OBJECT;
-	case 14: return eSpawnType::BANNER;
-	case 15: return eSpawnType::CAMPFIRE;
-	case 16: return eSpawnType::FLYER;
-	default: return eSpawnType::NONE;
-	}
-}
-
-bool matchFilter(const std::string& value, const std::string& filter, bool reverseFilter)
+bool matchFilter(std::string_view value, std::string_view filter, bool reverseFilter)
 {
 	if (filter.empty()) return true;
+
 	bool isMatch = (ci_find_substr(value, filter) != -1);
 
 	return reverseFilter ? !isMatch : isMatch;
 }
 
+/**
+ * /brief Performs comparisons for all filters against a given spawn
+ * 
+ * This filter checks a series of filters (distance, name, class, race, body type) against a given spawn.
+ * If any of the matches are failed the spawn is invalid and we return false.
+ * 
+ * \param pSpawn A pointer to the spawn object that is being checked
+ * \return Returns true if all filters are matched, or false if not.
+ */
 bool matchAllFilters(SPAWNINFO* pSpawn)
 {
-	float dist = GetDistance3D(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
-	if (dist < Filters::minDistance || dist > Filters::maxDistance)
-	{
-		//fail distance check
+	if (pSpawn == nullptr)
 		return false;
-	}
-	if (!Filters::name.empty() && !matchFilter(pSpawn->DisplayedName, Filters::name, Filters::nameReverse))
+	
+	/// Compare spawn type of pSpawn with our filter.
+	if (GetSpawnType(pSpawn) != filters.spawnTypeNames[filters.typeSelection].second)
+		return false;
+
+	float distSquared = Get3DDistanceSquared(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
+	/// Compare dist^2 against minDist^2 and maxDist^2
+	if (distSquared < filters.minDistance * filters.minDistance || distSquared > filters.maxDistance * filters.maxDistance)
+		return false;
+
+	if (filters.name[0] != '\0' && !matchFilter(pSpawn->DisplayedName, filters.name, filters.nameReverse))
 	{
+		/// fail name check
 		return false;
 	}
 
-	if (!Filters::className.empty() && !matchFilter(pSpawn->GetClassString(), Filters::className, Filters::classReverse))
+	if (filters.className[0] != '\0' && !matchFilter(pSpawn->GetClassString(), filters.className, filters.classReverse))
 	{
+		/// fail class name check
 		return false;
 	}
 
-	if (!Filters::raceName.empty() && !matchFilter(pSpawn->GetRaceString(), Filters::raceName, Filters::raceReverse))
+	if (filters.raceName[0] != '\0' && !matchFilter(pSpawn->GetRaceString(), filters.raceName, filters.raceReverse))
 	{
+		/// fail race name check
 		return false;
 	}
 
-	if (!Filters::bodyType.empty() && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), Filters::bodyType, Filters::bodyReverse))
+	if (filters.bodyType[0] != '\0' && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), filters.bodyType, filters.bodyReverse))
 	{
+		/// fail body type check
 		return false;
 	}
+	/// Spawn matches all filters
 	return true;
 }
 
+/**
+ * /brief Generate a list of spawns matching the currently set filters
+ * 
+ * Iterate over all spawns and compare them against currently set filters. Add spawns matching these filters to spawnList
+ * 
+ */
 void createSpawnList()
 {
-	
 	spawnList.clear();
 	SPAWNINFO* pSpawn = pSpawnList;
-	MQSpawnSearch SearchSpawn;
-	ClearSearchSpawn(&SearchSpawn);
-	SearchSpawn.SpawnType = getSpawnTypeFromSelection(Filters::typeSelection);
-	SearchSpawn.MinLevel = Filters::levelLow;
-	SearchSpawn.MaxLevel = Filters::levelHigh;
 	while (pSpawn)
 	{
-		if (SpawnMatchesSearch(&SearchSpawn, pLocalPlayer, pSpawn))
+		if (matchAllFilters(pSpawn))
 		{
-			if (matchAllFilters(pSpawn))
-			{
-				spawnList.emplace_back(pSpawn);
-			}
+			/// filters matched, add spawn to spawn list.
+			spawnList.emplace_back(pSpawn);
 		}
 		pSpawn = pSpawn->pNext;
 	}
+	filters.refreshTriggered = true;
 }
 
-void mlCmd(PlayerClient* pChar, const char* szLine) {
+/**
+ * \brief Prints the help message for the `/moblist help` command.
+ * 
+ * Prints a list of valid commands and their function for the MobList plugin. 
+ */
+void printHelp()
+{
+	WriteChatf(PLUGIN_MSG "\ar/moblist show		\ag--- Show UI");
+	WriteChatf(PLUGIN_MSG "\ar/moblist hide		\ag--- Hide UI");
+	WriteChatf(PLUGIN_MSG "\ar/moblist refresh	\ag--- Refresh spawn list");
+	WriteChatf(PLUGIN_MSG "\ar/moblist reset	\ag--- Reset all filters");
+	WriteChatf(PLUGIN_MSG "\ar/moblist help		\ag--- Show this help message");
+}
+
+/**
+ * \brief Command handler for the plugin's `/ml` command.
+ * 
+ * Handle commands issued via the `/ml` command.
+ *  * 
+ * \param pChar Pointer to the PlayerClient. (the character issuing the command)
+ * \param szLine The command issued
+ * 
+ * \note  Valid commands are:
+ *	-/moblist show: Show UI
+ *	-/moblist hide: Hide UI
+ *	-/moblist refresh: Refresh spawn list
+ *	-/moblist reset: Reset filters
+ *	-/moblist help: Display help
+ */
+void moblistCmd(PlayerClient* pChar, const char* szLine) {
 	char arg[MAX_STRING] = {};
 	GetMaybeQuotedArg(arg, MAX_STRING, szLine, 1);
-	if (strlen(arg))
+	if (arg[0] != '\0')
 	{
 		if (ci_equals(arg, "help"))
 		{
-			WriteChatf(PLUGIN_MSG "\ar/ml show	\ag--- Show UI");
-			WriteChatf(PLUGIN_MSG "\ar/ml hide	\ag--- Hide UI");
-			WriteChatf(PLUGIN_MSG "\r/ml reset	\ag--- Reset all filters");
-			WriteChatf(PLUGIN_MSG "\r/ml help	\ag--- Show this help message");
+			printHelp();
 			return;
 		}
 		if (ci_equals(arg, "show"))
 		{
-			showMobListWindow = true;
+			filters.showMobListWindow = true;
 			return;
 		}
 		if (ci_equals(arg, "hide"))
 		{
-			showMobListWindow = false;
+			filters.showMobListWindow = false;
 			return;
+		}
+		if (ci_equals(arg, "refresh"))
+		{
+			createSpawnList();
 		}
 		if (ci_equals(arg, "reset"))
 		{
-			Filters::initFilters();
+			filters.resetFilters(filters);
 			return;
 		}
 	}
 	else
 	{
-		WriteChatf(PLUGIN_MSG "\ar/ml show	\ag--- Show UI");
-		WriteChatf(PLUGIN_MSG "\ar/ml hide	\ag--- Hide UI");
-		WriteChatf(PLUGIN_MSG "\r/ml reset	\ag--- Reset all filters");
-		WriteChatf(PLUGIN_MSG "\r/ml help	\ag--- Show this help message");
+		printHelp();
 	}
 }
 
@@ -190,7 +169,7 @@ PLUGIN_API void InitializePlugin()
 		createSpawnList();
 	}
 	// Examples:
-	AddCommand("/ml", mlCmd);
+	AddCommand("/moblist", moblistCmd);
 	// AddXMLFile("MQUI_MyXMLFile.xml");
 	// AddMQ2Data("mytlo", MyTLOData);
 }
@@ -198,29 +177,68 @@ PLUGIN_API void InitializePlugin()
 PLUGIN_API void ShutdownPlugin()
 {
 	DebugSpewAlways("MQTaskHud::Shutting down");
-	RemoveCommand("/ml");
+	RemoveCommand("/moblist");
 	// RemoveXMLFile("MQUI_MyXMLFile.xml");
 	// RemoveMQ2Data("mytlo");
+}
+
+/**
+ * @fn OnAddSpawn
+ *
+ * This is called each time a spawn is added to a zone (ie, something spawns). It is
+ * also called for each existing spawn when a plugin first initializes.
+ *
+ * When zoning, this is called for all spawns in the zone after @ref OnEndZone is
+ * called and before @ref OnZoned is called.
+ *
+ * @param pNewSpawn PSPAWNINFO - The spawn that was added
+ */
+PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
+{
+	createSpawnList();
+	// DebugSpewAlways("MQtest::OnAddSpawn(%s)", pNewSpawn->Name);
+}
+
+/**
+ * @fn OnRemoveSpawn
+ *
+ * This is called each time a spawn is removed from a zone (ie, something despawns
+ * or is killed).  It is NOT called when a plugin shuts down.
+ *
+ * When zoning, this is called for all spawns in the zone after @ref OnBeginZone is
+ * called.
+ *
+ * @param pSpawn PSPAWNINFO - The spawn that was removed
+ */
+PLUGIN_API void OnRemoveSpawn(PSPAWNINFO pSpawn)
+{
+	createSpawnList();
+	// DebugSpewAlways("MQtest::OnRemoveSpawn(%s)", pSpawn->Name);
+}
+
+/**
+ * @fn OnZoned
+ *
+ * This is called after entering a new zone and the zone is considered "loaded."
+ *
+ * It occurs after @ref OnEndZone @ref OnAddSpawn and @ref OnAddGroundItem have
+ * been called.
+ */
+PLUGIN_API void OnZoned()
+{
+	// DebugSpewAlways("MQtest::OnZoned()");
+	createSpawnList();
 }
 
 PLUGIN_API void OnPulse()
 {
 	// Run only after timer is up
-	if (std::chrono::steady_clock::now() > PulseTimer)
-	{
-		// Wait 5 seconds before running again
-		PulseTimer = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-		if (GetGameState() == GAMESTATE_INGAME)
-		{
-			createSpawnList();
-		}
-	}
 }
 
 PLUGIN_API void OnUpdateImGui()
 {
 	if (GetGameState() == GAMESTATE_INGAME)
 	{
-		MobListImGui::drawMobList(spawnList);
+		drawMobList(spawnList, filters);
 	}
 }
