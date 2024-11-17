@@ -1,10 +1,10 @@
 # MQMobList
 
-One Paragraph project description goes here
+Provides a filterable and sortable of spawns in your current zone
 
 ## Getting Started
 
-Quick start instructions to get users up and going
+To load the plugin:
 
 ```txt
 /plugin MQMobList
@@ -12,31 +12,20 @@ Quick start instructions to get users up and going
 
 ### Commands
 
-Describe the commands available and how to use them.
+You may use the following commands:
 
 ```txt
-Give examples
+/moblist help     -- Display help
+/moblist show     -- Show the Mob List window
+/moblist hide     -- Hide the Mob List window
+/moblist refresh  -- Manually trigger refresh of spawn data
+/moblist reset    -- Reset all filters to default
 ```
-
-### Configuration File
-
-Describe the configuration file and what the settings do
-
-```yaml
-- Example goes here
-```
-
-## Other Notes
-
-Add additional notes
 
 ## Authors
 
-* **Your name** - *Initial work*
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+- **Lisie (yb-f)** - _Initial work_
 
 ## Acknowledgments
 
-* Inspiration from...
-* I'd like to thank the Thieves' Guild for helping me with all the code I stole...
+- Thank you brainiac, knightly, and dannuic for reviewing code.
