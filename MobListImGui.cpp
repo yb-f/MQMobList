@@ -31,30 +31,34 @@ void sortSpawnList(std::vector<SPAWNINFO*>& spawnList, ImGuiID column, bool asce
 		std::sort(spawnList.begin(), spawnList.end(), [column, ascending](SPAWNINFO* a, SPAWNINFO* b)
 		{
 			switch (column) {
-			case 0: return ascending ? a->SpawnID < b->SpawnID : a->SpawnID > b->SpawnID;
-			case 1: return ascending ? a->Level < b->Level : a->Level > b->Level;
-			case 2: {
+			case TableColumnID::ID: return ascending ? a->SpawnID < b->SpawnID : a->SpawnID > b->SpawnID;
+			case TableColumnID::Level: return ascending ? a->Level < b->Level : a->Level > b->Level;
+			case TableColumnID::DisplayName: {
 				int cmp = stricmp(a->DisplayedName, b->DisplayedName);
 				return ascending ? cmp < 0 : cmp > 0;
 			}
-			case 3: {
+			case TableColumnID::Name: {
 				int cmp = stricmp(a->Name, b->Name);
 				return ascending ? cmp < 0 : cmp > 0;
 			}
-			case 4: {
+			case TableColumnID::Surname: {
+				int cmp = stricmp(a->Lastname, b->Lastname);
+				return ascending ? cmp < 0 : cmp > 0;
+			}
+			case TableColumnID::Distance: {
 				float distA = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, a->X, a->Y, a->Z);
 				float distB = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, b->X, b->Y, b->Z);
 				return ascending ? distA < distB : distA > distB;
 			}
-			case 6: {
+			case TableColumnID::Body: {
 				int cmp = stricmp(GetBodyTypeDesc(GetBodyType(a)), GetBodyTypeDesc(GetBodyType(b)));
 				return ascending ? cmp < 0 : cmp > 0;
 			}
-			case 7: {
+			case TableColumnID::Race: {
 				int cmp = stricmp(a->GetRaceString(), b->GetRaceString());
 				return ascending ? cmp < 0 : cmp > 0;
 			}
-			case 8: {
+			case TableColumnID::Class: {
 				int cmp = stricmp(a->GetClassString(), b->GetClassString());
 				return ascending ? cmp < 0 : cmp > 0;
 			}
@@ -431,20 +435,21 @@ void drawMobListTable(std::vector<SPAWNINFO*>& spawnList, Filters filters)
 		return;
 	}
 		
-	if (ImGui::BeginTable("##List table", 9 + filters.directionArrow, TABLE_FLAGS))
+	if (ImGui::BeginTable("##List table", 10 + filters.directionArrow, TABLE_FLAGS))
 	{
-		ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_None, 0, 0);
-		ImGui::TableSetupColumn("Lvl", ImGuiTableColumnFlags_None, 0, 1);
-		ImGui::TableSetupColumn("Display Name", ImGuiTableColumnFlags_None, 0, 2);
-		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_None, 0, 3);
-		ImGui::TableSetupColumn("Dist", ImGuiTableColumnFlags_DefaultSort, 0, 4);
-		ImGui::TableSetupColumn("Loc", ImGuiTableColumnFlags_NoSort, 0, 5);
-		ImGui::TableSetupColumn("Body", ImGuiTableColumnFlags_None, 0, 6);
-		ImGui::TableSetupColumn("Race", ImGuiTableColumnFlags_None, 0, 7);
-		ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_None, 0, 8);
+		ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_None, 0, TableColumnID::ID);
+		ImGui::TableSetupColumn("Lvl", ImGuiTableColumnFlags_None, 0, TableColumnID::Level);
+		ImGui::TableSetupColumn("Display Name", ImGuiTableColumnFlags_None, 0, TableColumnID::DisplayName);
+		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_None, 0, TableColumnID::Name);
+		ImGui::TableSetupColumn("Surname", ImGuiTableColumnFlags_None, 0, TableColumnID::Surname);
+		ImGui::TableSetupColumn("Dist", ImGuiTableColumnFlags_DefaultSort, 0, TableColumnID::Distance);
+		ImGui::TableSetupColumn("Loc", ImGuiTableColumnFlags_NoSort, 0, TableColumnID::Location);
+		ImGui::TableSetupColumn("Body", ImGuiTableColumnFlags_None, 0, TableColumnID::Body);
+		ImGui::TableSetupColumn("Race", ImGuiTableColumnFlags_None, 0, TableColumnID::Race);
+		ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_None, 0, TableColumnID::Class);
 		if (filters.directionArrow)
 		{
-			ImGui::TableSetupColumn("Direction", ImGuiTableColumnFlags_NoSort, 0);
+			ImGui::TableSetupColumn("Direction", ImGuiTableColumnFlags_NoSort, 0, TableColumnID::Direction);
 		}
 		ImGui::TableSetupScrollFreeze(0, 1);
 		ImGui::TableHeadersRow();
@@ -488,23 +493,63 @@ void drawMobRow(SPAWNINFO* spawn, Filters filters)
 	ImGui::Selectable(std::to_string(spawn->SpawnID).c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
 	if (ImGui::IsItemHovered())
 	{
-		ImGui::SetTooltip("Right click to highlight\nLeft click to navigate self\nCtrl + left click to navigate group");
-		if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+		if (filters.serverType == 4)
 		{
-			WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn->DisplayedName);
-			DoCommandf("/highlight \"%s\"", spawn->DisplayedName);
-		}
-		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-		{
-			if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
+			ImGui::SetTooltip("Left click to target\nCtrl + left click to navigate self\nCtrl + Shift + left click to navigate group\nRight click to highlight\nCtrl + right click to search mob on allakhazam");	
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
 			{
-				WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-				DoCommandf("/dgae /nav id %d", spawn->SpawnID);
+				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
+				{
+					WriteChatf(PLUGIN_MSG "Looking up mob name \ar%s \awon allakhazam", spawn->DisplayedName);
+					std::string modifiedName = spawn->DisplayedName;
+					std::replace(modifiedName.begin(), modifiedName.end(), ' ', '+');
+					std::string url = "https://everquest.allakhazam.com/db/npclist.html?name=";
+					url += modifiedName;
+					ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOW);
+				}
+				else {
+					WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn->DisplayedName);
+					DoCommandf("/highlight \"%s\"", spawn->DisplayedName);
+				}
 			}
-			else
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 			{
-				WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-				DoCommandf("/nav id %d", spawn->SpawnID);
+				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl) && ImGui::IsKeyDown(ImGuiKey_ModShift))
+				{
+					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
+					DoCommandf("/dgae /nav id %d", spawn->SpawnID);
+				}
+				else if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
+				{
+					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
+					DoCommandf("/nav id %d", spawn->SpawnID);
+				}
+				else
+				{
+					WriteChatf(PLUGIN_MSG "Targeting \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
+					pTarget = spawn;
+				}
+			}
+		}
+		else {
+			ImGui::SetTooltip("Right click to highlight\nLeft click to navigate self\nCtrl + left click to navigate group");
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+			{
+				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn->DisplayedName);
+				DoCommandf("/highlight \"%s\"", spawn->DisplayedName);
+			}
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			{
+				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
+				{
+					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
+					DoCommandf("/dgae /nav id %d", spawn->SpawnID);
+				}
+				else
+				{
+					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
+					DoCommandf("/nav id %d", spawn->SpawnID);
+				}
 			}
 		}
 	}
@@ -524,6 +569,9 @@ void drawMobRow(SPAWNINFO* spawn, Filters filters)
 		ImGui::TableNextColumn();
 		ImGui::Text("%s", spawn->Name);
 	}
+	ImGui::TableNextColumn();
+	//Surname
+	ImGui::Text("%s", spawn->Lastname);
 	ImGui::TableNextColumn();
 	//calculate distance to spawn
 	float dist = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, spawn->X, spawn->Y, spawn->Z);

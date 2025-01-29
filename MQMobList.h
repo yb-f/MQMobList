@@ -52,14 +52,17 @@ public:
 	std::string className;
 	bool classReverse;
 	/// UI Settings
-	bool conColor = false;
+	bool conColor = true;
 	bool directionArrow = false;
-	bool showMobListWindow = true;
+	bool showMobListWindow = false
+		;
 	/// Sort triggers
 	unsigned int prevColumn = -1;
 	bool prevAscending;
 	bool refreshTriggered = false;
 	bool welcomeSent = false;
+	/// Server Type
+	int serverType;
 
 	Filters() {
 		typeNameCount = spawnTypeNames.size();
@@ -76,8 +79,9 @@ public:
 		raceReverse = false;
 		className = "";
 		classReverse = false;
-		conColor = false;
+		conColor = true;
 		directionArrow = false;
+		serverType = gBuild;
 	}
 	
 	void resetFilters(Filters& filters)

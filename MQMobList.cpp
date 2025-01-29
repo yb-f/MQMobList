@@ -170,7 +170,6 @@ PLUGIN_API void InitializePlugin()
 	}
 	// Examples:
 	AddCommand("/moblist", moblistCmd);
-	// AddXMLFile("MQUI_MyXMLFile.xml");
 	// AddMQ2Data("mytlo", MyTLOData);
 }
 
