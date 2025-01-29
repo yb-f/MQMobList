@@ -2,6 +2,7 @@
 #include "imgui/fonts/IconsMaterialDesign.h"
 #include <cmath>
 #include <imgui/misc/cpp/imgui_stdlib.h>
+#include "Theme.h"
 
 constexpr int ARROW_WIDTH = 5;
 constexpr int ARROW_HEIGHT = 15;
@@ -217,12 +218,14 @@ void drawMobList(std::vector<SPAWNINFO*>& spawnList, Filters& filters)
 		handlePendingRefresh();
 
 	if (!filters.showMobListWindow) return;
+	ImGuiStyle oldStyle = ImGuiTheme::ApplyTheme(filters.playerWinThemeId, filters.roundPlayerWin);
 	if (ImGui::Begin("Mob List", &filters.showMobListWindow, ImGuiWindowFlags_MenuBar))
 	{
 		drawMenu(filters);
 		drawSearchHeader(filters);
 		drawMobListTable(spawnList, filters);
 	}
+	ImGuiTheme::ResetTheme(oldStyle);
 	ImGui::End();
 }
 
@@ -247,8 +250,13 @@ void drawMenu(Filters& filters)
 				filters.directionArrow = !filters.directionArrow;
 				WriteChatf("Show Directional Arrow is now \ag%s", filters.directionArrow ? "enabled" : "disabled");
 			}
+			if (ImGui::MenuItem("Select Theme", NULL, filters.drawPicker))
+			{
+				filters.drawPicker = !filters.drawPicker;
+			}
 			ImGui::EndMenu();
 		}
+
 		ImGui::EndMenuBar();
 	}
 }
@@ -260,6 +268,10 @@ void drawMenu(Filters& filters)
  */
 void drawSearchHeader(Filters& filters)
 {
+	if (filters.drawPicker)
+	{
+		filters.playerWinThemeId = ImGuiTheme::DrawThemePicker(filters.playerWinThemeId, "Mob List");
+	}
 	ImGui::Text("Level Range");
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(45);

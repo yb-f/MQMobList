@@ -54,8 +54,11 @@ public:
 	/// UI Settings
 	bool conColor = true;
 	bool directionArrow = false;
-	bool showMobListWindow = false
-		;
+	bool showMobListWindow = false;
+	/// Theme Settings
+	int playerWinThemeId;
+	bool roundPlayerWin;
+	bool drawPicker;
 	/// Sort triggers
 	unsigned int prevColumn = -1;
 	bool prevAscending;
@@ -82,6 +85,10 @@ public:
 		conColor = true;
 		directionArrow = false;
 		serverType = gBuild;
+		//temp til i can sider putting in settings persitance
+		playerWinThemeId = 10;
+		roundPlayerWin = false;
+		drawPicker = false;
 	}
 	
 	void resetFilters(Filters& filters)
