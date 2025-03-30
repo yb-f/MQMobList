@@ -13,6 +13,7 @@ PLUGIN_VERSION(0.2);
 
 SpawnList spawnList;
 uint32_t bmMobListRefresh;
+bool bZoning = false;
 
 Filters filters;
 
@@ -103,9 +104,14 @@ void moblistCmd(PlayerClient* pChar, const char* szLine) {
 PLUGIN_API void OnBeginZone()
 {
 	spawnList.Clear();
+	bZoning = true;
 	// DebugSpewAlways("MQImMap::OnBeginZone()");
 }
 
+PLUGIN_API void OnEndZone()
+{
+	bZoning = false;
+}
 PLUGIN_API void InitializePlugin()
 {
 	DebugSpewAlways("MQMobList::Initializing version %f", MQ2Version);
@@ -154,7 +160,7 @@ PLUGIN_API void OnPulse()
 
 PLUGIN_API void OnUpdateImGui()
 {
-	if (GetGameState() == GAMESTATE_INGAME)
+	if (GetGameState() == GAMESTATE_INGAME && !bZoning)
 	{
 		EnterMQ2Benchmark(bmMobListRefresh);
 		drawMobList(spawnList, filters);
