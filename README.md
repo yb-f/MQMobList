@@ -1,6 +1,6 @@
 # MQMobList
 
-Provides a filterable and sortable of spawns in your current zone
+Provides a filterable and sortable table of spawns in your current zone.
 
 ## Installation
 
