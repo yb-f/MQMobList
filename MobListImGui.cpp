@@ -347,7 +347,7 @@ void drawMobListTable(SpawnList& spawnList, Filters& filters)
 		return;
 	}
 
-	spawnList.updateSpawnsDistances(filters);
+	spawnList.updateSpawnDistances(filters);
 
 	if (ImGui::BeginTable("##List table", 10 + filters.directionArrow, TABLE_FLAGS))
 	{
