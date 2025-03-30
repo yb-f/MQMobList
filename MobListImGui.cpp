@@ -334,7 +334,6 @@ void drawSearchHeader(Filters& filters, SpawnList& spawnList)
 	{
 		ImGui::SetTooltip("Reverse Filter class");
 	}
-	ImGui::Text("Debounce Timer: %.3f", filters.debounceTimer);
 	if (filters.debounceTimer > 0.0f)
 	{
 		filters.debounceTimer -= ImGui::GetIO().DeltaTime; // Decrease timer based on frame time.
