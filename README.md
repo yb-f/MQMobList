@@ -15,6 +15,10 @@ To load the plugin:
 ```txt
 /plugin MQMobList
 ```
+To show the moblist window:
+```txt
+/moblist show
+```
 
 ## Features
 - **Filterable Mob List:**  Easily filter mobs by type, level, distance,or other criteria.
