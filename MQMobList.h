@@ -81,7 +81,7 @@ public:
 	bool drawPicker;
 	/// Sort triggers
 	unsigned int prevColumn = -1;
-	bool prevAscending;
+	bool prevAscending = true;
 	bool spawnAdded = false;
 	bool welcomeSent = false;
 	/// Server Type
@@ -157,6 +157,7 @@ public:
 		if (m_bFiltersMismatch) {
 			return;
 		}
+		UpdateDistance(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
 
 		if (!CheckDistance(filters)) {
 			m_bDistanceMismatch = true;
@@ -271,6 +272,14 @@ public:
 		for (auto& spawnObject : spawns)
 		{
 			matchAllFilters(spawnObject, filters);
+		}
+	}
+
+	void updateSpawnDistances(const Filters& filters)
+	{
+		for (auto& spawnObject : spawns)
+		{
+			spawnObject.UpdateDistanceFlag(filters);
 		}
 	}
 

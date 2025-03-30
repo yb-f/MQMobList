@@ -10,19 +10,6 @@ constexpr int ARROW_SIZE = 25;
 constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
 	ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
 
-
-/**
- * \brief Check if item is in a visible row
- * 
- * \param rowIndex rowIndex of the item being checked
- * \param visableStart first visible row
- * \param visableEnd last visible row
- * \return true if visible 
- */
-bool isRowVisible(int rowIndex, int visableStart, int visableEnd) {
-	return rowIndex >= visableStart && rowIndex <= visableEnd;
-}
-
 /**
  * \brief Rotate point based off center points and angle
  * 
@@ -352,13 +339,15 @@ void drawSearchHeader(Filters& filters, SpawnList& spawnList)
  * \param spawnList The List of spawns
  * \param filters Filters object
  */
-void drawMobListTable(SpawnList& spawnList, Filters filters)
+void drawMobListTable(SpawnList& spawnList, Filters& filters)
 {
 	if (spawnList.empty())
 	{
 		ImGui::Text("Spawn list empty");
 		return;
 	}
+
+	spawnList.updateSpawnsDistances(filters);
 
 	if (ImGui::BeginTable("##List table", 10 + filters.directionArrow, TABLE_FLAGS))
 	{
@@ -415,9 +404,6 @@ void drawMobListTable(SpawnList& spawnList, Filters filters)
  */
 void drawMobRow(const SpawnObject& spawn, Filters filters)
 {
-	if (!spawn.m_bDisplayed)
-		return;
-
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 	ImGui::Selectable(std::to_string(spawn.m_pSpawn->SpawnID).c_str(), false, ImGuiSelectableFlags_SpanAllColumns);

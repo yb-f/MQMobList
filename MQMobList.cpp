@@ -12,8 +12,6 @@ PreSetup("MQMobList");
 PLUGIN_VERSION(0.2);
 
 SpawnList spawnList;
-bool bZoning = false;
-bool bFullRefresh = true;
 uint32_t bmMobListRefresh;
 
 Filters filters;
@@ -133,13 +131,11 @@ PLUGIN_API void OnAddSpawn(PlayerClient* pSpawn)
 	SpawnObject& pSpawnObject = spawnList.GetSpawn(pSpawn);
 	spawnList.matchAllFilters(pSpawnObject, filters);
 	filters.spawnAdded = true;
-	// DebugSpewAlways("MQtest::OnAddSpawn(%s)", pNewSpawn->Name);
 }
 
 PLUGIN_API void OnRemoveSpawn(PlayerClient* pSpawn)
 {
 	spawnList.RemoveSpawn(pSpawn);
-	// DebugSpewAlways("MQtest::OnRemoveSpawn(%s)", pSpawn->Name);
 }
 
 PLUGIN_API void OnPulse()
@@ -158,7 +154,7 @@ PLUGIN_API void OnPulse()
 
 PLUGIN_API void OnUpdateImGui()
 {
-	if (GetGameState() == GAMESTATE_INGAME && !bZoning)
+	if (GetGameState() == GAMESTATE_INGAME)
 	{
 		EnterMQ2Benchmark(bmMobListRefresh);
 		drawMobList(spawnList, filters);
