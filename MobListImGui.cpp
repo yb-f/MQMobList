@@ -402,7 +402,7 @@ void drawMobListTable(SpawnList& spawnList, Filters& filters)
  * \param spawn The spawn to be displayed
  * \param filters Filters object
  */
-void drawMobRow(const SpawnObject& spawn, Filters filters)
+void drawMobRow(const SpawnObject& spawn, Filters& filters)
 {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
