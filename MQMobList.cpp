@@ -27,7 +27,7 @@ Filters filters;
 void createSpawnList()
 {
 	spawnList.Clear();
-	SPAWNINFO* pSpawn = pSpawnList;
+	PlayerClient* pSpawn = pSpawnList;
 	while (pSpawn)
 	{
 		spawnList.AddSpawn(pSpawn);
@@ -108,11 +108,6 @@ PLUGIN_API void OnBeginZone()
 	// DebugSpewAlways("MQImMap::OnBeginZone()");
 }
 
-PLUGIN_API void OnEndZone()
-{
-	// DebugSpewAlways("MQImMap::OnEndZone()");
-}
-
 PLUGIN_API void InitializePlugin()
 {
 	DebugSpewAlways("MQMobList::Initializing version %f", MQ2Version);
@@ -124,24 +119,13 @@ PLUGIN_API void InitializePlugin()
 
 PLUGIN_API void ShutdownPlugin()
 {
-	DebugSpewAlways("MQTaskHud::Shutting down");
+	DebugSpewAlways("MQMobList::Shutting down");
 	RemoveCommand("/moblist");
 	// RemoveXMLFile("MQUI_MyXMLFile.xml");
 	// RemoveMQ2Data("mytlo");
 }
 
-/**
- * @fn OnAddSpawn
- *
- * This is called each time a spawn is added to a zone (ie, something spawns). It is
- * also called for each existing spawn when a plugin first initializes.
- *
- * When zoning, this is called for all spawns in the zone after @ref OnEndZone is
- * called and before @ref OnZoned is called.
- *
- * @param pNewSpawn PSPAWNINFO - The spawn that was added
- */
-PLUGIN_API void OnAddSpawn(PSPAWNINFO pSpawn)
+PLUGIN_API void OnAddSpawn(PlayerClient* pSpawn)
 {
 	spawnList.AddSpawn(pSpawn);
 
@@ -152,36 +136,10 @@ PLUGIN_API void OnAddSpawn(PSPAWNINFO pSpawn)
 	// DebugSpewAlways("MQtest::OnAddSpawn(%s)", pNewSpawn->Name);
 }
 
-/**
- * @fn OnRemoveSpawn
- *
- * This is called each time a spawn is removed from a zone (ie, something despawns
- * or is killed).  It is NOT called when a plugin shuts down.
- *
- * When zoning, this is called for all spawns in the zone after @ref OnBeginZone is
- * called.
- *
- * @param pSpawn PSPAWNINFO - The spawn that was removed
- */
-PLUGIN_API void OnRemoveSpawn(PSPAWNINFO pSpawn)
+PLUGIN_API void OnRemoveSpawn(PlayerClient* pSpawn)
 {
 	spawnList.RemoveSpawn(pSpawn);
 	// DebugSpewAlways("MQtest::OnRemoveSpawn(%s)", pSpawn->Name);
-}
-
-/**
- * @fn OnZoned
- *
- * This is called after entering a new zone and the zone is considered "loaded."
- *
- * It occurs after @ref OnEndZone @ref OnAddSpawn and @ref OnAddGroundItem have
- * been called.
- */
-PLUGIN_API void OnZoned()
-{
-	// DebugSpewAlways("MQtest::OnZoned()");
-	///Lets handle this in onpulse instead
-	//createSpawnList();
 }
 
 PLUGIN_API void OnPulse()

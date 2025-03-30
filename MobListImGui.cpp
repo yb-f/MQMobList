@@ -50,7 +50,7 @@ ImVec2 rotatePoint(ImVec2 point, float centerX, float centerY, float angle)
  * \param spawn The spawn to be checked
  * \return ImVec4 color code
  */
-ImVec4 getConColor(SPAWNINFO * spawn)
+ImVec4 getConColor(PlayerClient* spawn)
 {
 	switch (ConColor(spawn))
 	{
@@ -78,7 +78,7 @@ ImVec4 getConColor(SPAWNINFO * spawn)
  * \param spawn The spawn to determine the angle of
  * \return The relative angle to the spawn
  */
-float calculateRelativeAngleTo(SPAWNINFO* spawn)
+float calculateRelativeAngleTo(PlayerClient* spawn)
 {
 	float diffX = pLocalPlayer->X - spawn->X;
 	float diffY = pLocalPlayer->Y - spawn->Y;
@@ -516,7 +516,7 @@ void drawMobRow(const SpawnObject& spawn, Filters filters)
  * \param spawn The spawn we are drawing for
  * \param cursorPos The current position of the cursor
  */
-void drawDirectionalArrow(SPAWNINFO* spawn, ImVec2 cursorPos)
+void drawDirectionalArrow(PlayerClient* spawn, ImVec2 cursorPos)
 {
 	float angle = calculateRelativeAngleTo(spawn);
 	ImVec2 p1 = ImVec2(cursorPos.x + ARROW_SIZE / 2, cursorPos.y);

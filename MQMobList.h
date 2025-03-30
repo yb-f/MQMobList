@@ -130,13 +130,13 @@ public:
 
 class SpawnObject {
 public:
-	SPAWNINFO* m_pSpawn; //pointer to the spawn
+	PlayerClient* m_pSpawn; //pointer to the spawn
 	bool m_bDisplayed; // should this spawn be displayed
 	bool m_bFiltersMismatch; // Does this match the selected filters
 	bool m_bDistanceMismatch;  // Is this within the selected distance
 	float m_fDistance; //Calculated distance to spawn SQUARED
 
-	SpawnObject(SPAWNINFO* pSpawn)
+	SpawnObject(PlayerClient* pSpawn)
 		: m_pSpawn(pSpawn), m_bDisplayed(false), m_fDistance(0.0f), 
 		m_bDistanceMismatch(false), m_bFiltersMismatch(false) {}
 
@@ -178,11 +178,11 @@ private:
 	std::vector<SpawnObject> spawns;
 
 public:
-	void AddSpawn(SPAWNINFO* pSpawn) {
+	void AddSpawn(PlayerClient* pSpawn) {
 		spawns.push_back(SpawnObject(pSpawn));
 	}
 
-	void RemoveSpawn(SPAWNINFO* pSpawn) {
+	void RemoveSpawn(PlayerClient* pSpawn) {
 		auto it = std::find_if(spawns.begin(), spawns.end(),
 			[pSpawn](const SpawnObject& obj) { return obj.m_pSpawn == pSpawn; });
 
@@ -191,7 +191,7 @@ public:
 		}
 	}
 
-	SpawnObject& GetSpawn(SPAWNINFO* pSpawn)
+	SpawnObject& GetSpawn(PlayerClient* pSpawn)
 	{
 		for (auto& spawnObj : spawns)
 		{
@@ -217,8 +217,7 @@ public:
 
 	void matchAllFilters(SpawnObject& pSpawnObject, const Filters& filters)
 	{
-		// Store the SPAWNINFO pointer in a local variable for efficiency
-		SPAWNINFO* pSpawn = pSpawnObject.m_pSpawn;
+		PlayerClient* pSpawn = pSpawnObject.m_pSpawn;
 
 		bool nonDistMismatch = false;
 		if (GetSpawnType(pSpawnObject.m_pSpawn) != filters.typeSelection)
@@ -280,8 +279,8 @@ public:
 			std::sort(spawns.begin(), spawns.end(), [&](const SpawnObject& a, const SpawnObject& b) {
 				if (a.m_bDisplayed != b.m_bDisplayed)
 					return a.m_bDisplayed > b.m_bDisplayed;
-				SPAWNINFO* spawnA = a.m_pSpawn;
-				SPAWNINFO* spawnB = b.m_pSpawn;
+				PlayerClient* spawnA = a.m_pSpawn;
+				PlayerClient* spawnB = b.m_pSpawn;
 				
 				switch (column) {
 				case TableColumnID::ID:
