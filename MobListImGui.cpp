@@ -10,67 +10,6 @@ constexpr int ARROW_SIZE = 25;
 constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
 	ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
 
-/// Variables used for rate limiting createSpawnList() calls when changing filters 
-static const std::chrono::milliseconds refreshInterval(200);
-static std::chrono::steady_clock::time_point lastRefreshTime = std::chrono::steady_clock::now();
-static bool pendingRefresh = false;
-
-
-/**
- * \brief Sort spawn list
- * 
- * Sort spawns in the spawn list based on sort column and ascending/descending selection.
- * 
- * \param spawnList The list of spawns
- * \param column The columnID of sort column
- * \param ascending Boolean for determining sort order (ascending/descending)
- * \param filters Filters class object
- */
-void sortSpawnList(std::vector<SPAWNINFO*>& spawnList, ImGuiID column, bool ascending, Filters filters) {
-	if (column != filters.prevColumn || ascending != filters.prevAscending || filters.refreshTriggered)
-	{
-		std::sort(spawnList.begin(), spawnList.end(), [column, ascending](SPAWNINFO* a, SPAWNINFO* b)
-		{
-			switch (column) {
-			case TableColumnID::ID: return ascending ? a->SpawnID < b->SpawnID : a->SpawnID > b->SpawnID;
-			case TableColumnID::Level: return ascending ? a->Level < b->Level : a->Level > b->Level;
-			case TableColumnID::DisplayName: {
-				int cmp = stricmp(a->DisplayedName, b->DisplayedName);
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			case TableColumnID::Name: {
-				int cmp = stricmp(a->Name, b->Name);
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			case TableColumnID::Surname: {
-				int cmp = stricmp(a->Lastname, b->Lastname);
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			case TableColumnID::Distance: {
-				float distA = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, a->X, a->Y, a->Z);
-				float distB = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, b->X, b->Y, b->Z);
-				return ascending ? distA < distB : distA > distB;
-			}
-			case TableColumnID::Body: {
-				int cmp = stricmp(GetBodyTypeDesc(GetBodyType(a)), GetBodyTypeDesc(GetBodyType(b)));
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			case TableColumnID::Race: {
-				int cmp = stricmp(a->GetRaceString(), b->GetRaceString());
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			case TableColumnID::Class: {
-				int cmp = stricmp(a->GetClassString(), b->GetClassString());
-				return ascending ? cmp < 0 : cmp > 0;
-			}
-			default: return false;
-			}
-		});
-		filters.refreshTriggered = false;
-		filters.prevColumn = column;
-		filters.prevAscending = ascending;
-	}
-}
 
 /**
  * \brief Check if item is in a visible row
@@ -165,45 +104,6 @@ float calculateRelativeAngleTo(SPAWNINFO* spawn)
 	return angle;
 }
 
-/**
- * \brief Throttled call to createSpawnList()
- * 
- * A throttled call to createSpawnList() to prevent excessive calls in quick succession
- */
-void refreshRateLimit()
-{
-	auto now = std::chrono::steady_clock::now();
-
-	if (now - lastRefreshTime > refreshInterval)
-	{
-		createSpawnList();
-		lastRefreshTime = now;
-		pendingRefresh = false;
-	}
-	else
-	{
-		pendingRefresh = true;
-	}
-}
-
-/**
- * /brief Determine if there are any pending refreshes of spawn data and process them if so
- * 
- */
-void handlePendingRefresh()
-{
-	if (pendingRefresh)
-	{
-		auto now = std::chrono::steady_clock::now();
-		if (now - lastRefreshTime > refreshInterval)
-		{
-			createSpawnList();
-			lastRefreshTime = now;
-			pendingRefresh = false;
-		}
-	}
-}
-
 /// --------------------------------------------------------------------------------------------------------------
 
 /**
@@ -212,17 +112,14 @@ void handlePendingRefresh()
  * \param spawnList the list of spawns
  * \param filters Filters object 
  */
-void drawMobList(std::vector<SPAWNINFO*>& spawnList, Filters& filters)
+void drawMobList(SpawnList& spawnList, Filters& filters)
 {
-	if (pendingRefresh)
-		handlePendingRefresh();
-
 	if (!filters.showMobListWindow) return;
 	ImGuiStyle oldStyle = ImGuiTheme::ApplyTheme(filters.playerWinThemeId, filters.roundPlayerWin);
 	if (ImGui::Begin("Mob List", &filters.showMobListWindow, ImGuiWindowFlags_MenuBar))
 	{
 		drawMenu(filters);
-		drawSearchHeader(filters);
+		drawSearchHeader(filters, spawnList);
 		drawMobListTable(spawnList, filters);
 	}
 	ImGuiTheme::ResetTheme(oldStyle);
@@ -243,12 +140,12 @@ void drawMenu(Filters& filters)
 			if (ImGui::MenuItem("Show Con Colors", NULL, filters.conColor))
 			{
 				filters.conColor = !filters.conColor;
-				WriteChatf("Show Con Colors is now \ag%s", filters.conColor ? "enabled" : "disabled");
+				WriteChatf(PLUGIN_MSG "Show Con Colors is now \ag%s", filters.conColor ? "enabled" : "disabled");
 			}
 			if (ImGui::MenuItem("Show Directional Arrow", NULL, filters.directionArrow))
 			{
 				filters.directionArrow = !filters.directionArrow;
-				WriteChatf("Show Directional Arrow is now \ag%s", filters.directionArrow ? "enabled" : "disabled");
+				WriteChatf(PLUGIN_MSG "Show Directional Arrow is now \ag%s", filters.directionArrow ? "enabled" : "disabled");
 			}
 			if (ImGui::MenuItem("Select Theme", NULL, filters.drawPicker))
 			{
@@ -266,7 +163,7 @@ void drawMenu(Filters& filters)
  * 
  * \param filters Filters object
  */
-void drawSearchHeader(Filters& filters)
+void drawSearchHeader(Filters& filters, SpawnList& spawnList)
 {
 	if (filters.drawPicker)
 	{
@@ -277,6 +174,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(45);
 	if (ImGui::InputInt("##LowLevel", &filters.levelLow, 0))
 	{
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -286,19 +184,19 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(45);
 	if (ImGui::InputInt("##HighLevel", &filters.levelHigh, 0))
 	{
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
 		ImGui::SetTooltip("Highest level to display");
 	}
-
 	ImGui::SameLine();
 	ImGui::Text("Name");
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(200);
 	if (ImGui::InputText("##Name", &filters.name))
 	{
-		refreshRateLimit();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -307,7 +205,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SameLine();
 	if (ImGui::Checkbox("##NameReverse", &filters.nameReverse))
 	{
-		createSpawnList();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -319,6 +217,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(50);
 	if (ImGui::InputInt("##DistanceLow", &filters.minDistance, 0))
 	{
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -328,29 +227,29 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(50);
 	if (ImGui::InputInt("##DistanceHigh", &filters.maxDistance, 0))
 	{
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
 		ImGui::SetTooltip("Maximum Distance (further than this will not be shown)");
 	}
-
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth(85);
 	if (ImGui::BeginCombo("##TypeSelection", filters.spawnTypeNames[filters.typeSelection].first))
 	{
-		for (int i = 0; i < filters.typeNameCount; ++i)
+		for (size_t i = 0; i < filters.spawnTypeNames.size(); ++i)
 		{
 			bool is_selected = (filters.typeSelection == i);
 			if (ImGui::Selectable(filters.spawnTypeNames[i].first, is_selected))
 			{
-				filters.typeSelection = i;
+				filters.typeSelection = filters.spawnTypeNames[i].second;
 			}
-			createSpawnList();
 			if (is_selected)
 			{
 				ImGui::SetItemDefaultFocus();
 			}
 		}
+		filters.debounceTimer = filters.debounceDelay;
 		ImGui::EndCombo();
 	}
 	if (ImGui::IsItemHovered())
@@ -360,6 +259,10 @@ void drawSearchHeader(Filters& filters)
 
 	ImGui::SameLine();
 	ImGui::Text("Direction");
+	if (ImGui::Checkbox("##DirectionArrow", &filters.directionArrow))
+	{
+		filters.debounceTimer = filters.debounceDelay;
+	}
 	ImGui::SameLine();
 	ImGui::SameLine();
 	if (ImGui::Button("Clear Highlights"))
@@ -372,7 +275,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(100);
 	if (ImGui::InputText("##Body", &filters.bodyType))
 	{
-		refreshRateLimit();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -381,7 +284,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SameLine();
 	if (ImGui::Checkbox("##BodyReverse", &filters.bodyReverse))
 	{
-		createSpawnList();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -394,7 +297,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(100);
 	if (ImGui::InputText("##Race", &filters.raceName))
 	{
-		refreshRateLimit();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -403,7 +306,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SameLine();
 	if (ImGui::Checkbox("##RaceReverse", &filters.raceReverse))
 	{
-		createSpawnList();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -416,7 +319,7 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SetNextItemWidth(100);
 	if (ImGui::InputText("##Class", &filters.className))
 	{
-		refreshRateLimit();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
@@ -425,11 +328,22 @@ void drawSearchHeader(Filters& filters)
 	ImGui::SameLine();
 	if (ImGui::Checkbox("##ClassReverse", &filters.classReverse))
 	{
-		createSpawnList();
+		filters.debounceTimer = filters.debounceDelay;
 	}
 	if (ImGui::IsItemHovered())
 	{
 		ImGui::SetTooltip("Reverse Filter class");
+	}
+	ImGui::Text("Debounce Timer: %.3f", filters.debounceTimer);
+	if (filters.debounceTimer > 0.0f)
+	{
+		filters.debounceTimer -= ImGui::GetIO().DeltaTime; // Decrease timer based on frame time.
+		if (filters.debounceTimer <= 0.0f)
+		{
+			filters.debounceTimer = 0.0f;
+			// Trigger update after debounce delay
+			spawnList.updateDisplayedSpawns(filters); // Trigger the update of displayed spawns.
+		}
 	}
 }
 
@@ -439,22 +353,22 @@ void drawSearchHeader(Filters& filters)
  * \param spawnList The List of spawns
  * \param filters Filters object
  */
-void drawMobListTable(std::vector<SPAWNINFO*>& spawnList, Filters filters)
+void drawMobListTable(SpawnList& spawnList, Filters filters)
 {
 	if (spawnList.empty())
 	{
 		ImGui::Text("Spawn list empty");
 		return;
 	}
-		
+
 	if (ImGui::BeginTable("##List table", 10 + filters.directionArrow, TABLE_FLAGS))
 	{
-		ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_None, 0, TableColumnID::ID);
+		ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_DefaultSort, 0, TableColumnID::ID);
 		ImGui::TableSetupColumn("Lvl", ImGuiTableColumnFlags_None, 0, TableColumnID::Level);
 		ImGui::TableSetupColumn("Display Name", ImGuiTableColumnFlags_None, 0, TableColumnID::DisplayName);
 		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_None, 0, TableColumnID::Name);
 		ImGui::TableSetupColumn("Surname", ImGuiTableColumnFlags_None, 0, TableColumnID::Surname);
-		ImGui::TableSetupColumn("Dist", ImGuiTableColumnFlags_DefaultSort, 0, TableColumnID::Distance);
+		ImGui::TableSetupColumn("Dist", ImGuiTableColumnFlags_None, 0, TableColumnID::Distance);
 		ImGui::TableSetupColumn("Loc", ImGuiTableColumnFlags_NoSort, 0, TableColumnID::Location);
 		ImGui::TableSetupColumn("Body", ImGuiTableColumnFlags_None, 0, TableColumnID::Body);
 		ImGui::TableSetupColumn("Race", ImGuiTableColumnFlags_None, 0, TableColumnID::Race);
@@ -473,20 +387,22 @@ void drawMobListTable(std::vector<SPAWNINFO*>& spawnList, Filters filters)
 			ImGuiID columnId = sortSpec.ColumnUserID;
 			bool ascending = (sortSpec.SortDirection == ImGuiSortDirection_Ascending);
 
-			sortSpawnList(spawnList, columnId, ascending, filters);
+			spawnList.sortSpawns(columnId, ascending, filters);
 		}
 		
 		ImGuiListClipper clipper;
-		clipper.Begin(spawnList.size());
+		clipper.Begin(spawnList.visibleSize());
 
 		while (clipper.Step())
 		{
 			for (int rowIndex = clipper.DisplayStart; rowIndex < clipper.DisplayEnd; ++rowIndex)
 			{
-				SPAWNINFO* spawn = spawnList[rowIndex];
+				const SpawnObject& spawn = spawnList[rowIndex];
+				if (!spawn.m_bDisplayed)
+					break;
+
 				drawMobRow(spawn, filters);
 			}
-		
 		}
 		ImGui::EndTable();
 	}
@@ -498,11 +414,14 @@ void drawMobListTable(std::vector<SPAWNINFO*>& spawnList, Filters filters)
  * \param spawn The spawn to be displayed
  * \param filters Filters object
  */
-void drawMobRow(SPAWNINFO* spawn, Filters filters)
+void drawMobRow(const SpawnObject& spawn, Filters filters)
 {
+	if (!spawn.m_bDisplayed)
+		return;
+
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
-	ImGui::Selectable(std::to_string(spawn->SpawnID).c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
+	ImGui::Selectable(std::to_string(spawn.m_pSpawn->SpawnID).c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
 	if (ImGui::IsItemHovered())
 	{
 		if (filters.serverType == 4)
@@ -510,36 +429,25 @@ void drawMobRow(SPAWNINFO* spawn, Filters filters)
 			ImGui::SetTooltip("Left click to target\nCtrl + left click to navigate self\nCtrl + Shift + left click to navigate group\nRight click to highlight\nCtrl + right click to search mob on allakhazam");	
 			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
 			{
-				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
-				{
-					WriteChatf(PLUGIN_MSG "Looking up mob name \ar%s \awon allakhazam", spawn->DisplayedName);
-					std::string modifiedName = spawn->DisplayedName;
-					std::replace(modifiedName.begin(), modifiedName.end(), ' ', '+');
-					std::string url = "https://everquest.allakhazam.com/db/npclist.html?name=";
-					url += modifiedName;
-					ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOW);
-				}
-				else {
-					WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn->DisplayedName);
-					DoCommandf("/highlight \"%s\"", spawn->DisplayedName);
-				}
+				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn.m_pSpawn->DisplayedName);
+				DoCommandf("/highlight \"%s\"", spawn.m_pSpawn->DisplayedName);
 			}
 			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 			{
 				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl) && ImGui::IsKeyDown(ImGuiKey_ModShift))
 				{
-					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-					DoCommandf("/dgae /nav id %d", spawn->SpawnID);
+					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn.m_pSpawn->DisplayedName, spawn.m_pSpawn->SpawnID);
+					DoCommandf("/dgae /nav id %d", spawn.m_pSpawn->SpawnID);
 				}
 				else if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
 				{
-					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-					DoCommandf("/nav id %d", spawn->SpawnID);
+					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn.m_pSpawn->DisplayedName, spawn.m_pSpawn->SpawnID);
+					DoCommandf("/nav id %d", spawn.m_pSpawn->SpawnID);
 				}
 				else
 				{
-					WriteChatf(PLUGIN_MSG "Targeting \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-					pTarget = spawn;
+					WriteChatf(PLUGIN_MSG "Targeting \ar%s \awID \ar%d", spawn.m_pSpawn->DisplayedName, spawn.m_pSpawn->SpawnID);
+					pTarget = spawn.m_pSpawn;
 				}
 			}
 		}
@@ -547,60 +455,59 @@ void drawMobRow(SPAWNINFO* spawn, Filters filters)
 			ImGui::SetTooltip("Right click to highlight\nLeft click to navigate self\nCtrl + left click to navigate group");
 			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
 			{
-				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn->DisplayedName);
-				DoCommandf("/highlight \"%s\"", spawn->DisplayedName);
+				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn.m_pSpawn->DisplayedName);
+				DoCommandf("/highlight \"%s\"", spawn.m_pSpawn->DisplayedName);
 			}
 			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 			{
 				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
 				{
-					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-					DoCommandf("/dgae /nav id %d", spawn->SpawnID);
+					WriteChatf(PLUGIN_MSG "Navigating \aogroup \awto \ar%s \awID \ar%d", spawn.m_pSpawn->DisplayedName, spawn.m_pSpawn->SpawnID);
+					DoCommandf("/dgae /nav id %d", spawn.m_pSpawn->SpawnID);
 				}
 				else
 				{
-					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn->DisplayedName, spawn->SpawnID);
-					DoCommandf("/nav id %d", spawn->SpawnID);
+					WriteChatf(PLUGIN_MSG "Navigating \aoself \awto \ar%s \awID \ar%d", spawn.m_pSpawn->DisplayedName, spawn.m_pSpawn->SpawnID);
+					DoCommandf("/nav id %d", spawn.m_pSpawn->SpawnID);
 				}
 			}
 		}
 	}
 	ImGui::TableNextColumn();
-	ImGui::Text("%d", spawn->Level);
+	ImGui::Text("%d", spawn.m_pSpawn->Level);
 	ImGui::TableNextColumn();
 	if (filters.conColor)
 	{
-		auto color = getConColor(spawn);
-		ImGui::TextColored(color, "%s", spawn->DisplayedName);
+		auto color = getConColor(spawn.m_pSpawn);
+		ImGui::TextColored(color, "%s", spawn.m_pSpawn->DisplayedName);
 		ImGui::TableNextColumn();
-		ImGui::TextColored(color, "%s", spawn->Name);
+		ImGui::TextColored(color, "%s", spawn.m_pSpawn->Name);
 	}
 	else
 	{
-		ImGui::Text("%s", spawn->DisplayedName);
+		ImGui::Text("%s", spawn.m_pSpawn->DisplayedName);
 		ImGui::TableNextColumn();
-		ImGui::Text("%s", spawn->Name);
+		ImGui::Text("%s", spawn.m_pSpawn->Name);
 	}
 	ImGui::TableNextColumn();
 	//Surname
-	ImGui::Text("%s", spawn->Lastname);
+	ImGui::Text("%s", spawn.m_pSpawn->Lastname);
 	ImGui::TableNextColumn();
 	//calculate distance to spawn
-	float dist = GetDistance3D(pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z, spawn->X, spawn->Y, spawn->Z);
-	ImGui::Text("%.1f", dist);
+	ImGui::Text("%.1f", sqrt(spawn.m_fDistance));
 	ImGui::TableNextColumn();
-	ImGui::Text("%.1f, %.1f, %.1f", spawn->Y, spawn->X, spawn->Z);
+	ImGui::Text("%.1f, %.1f, %.1f", spawn.m_pSpawn->Y, spawn.m_pSpawn->X, spawn.m_pSpawn->Z);
 	ImGui::TableNextColumn();
 	//get body type
-	ImGui::Text("%s", GetBodyTypeDesc(GetBodyType(spawn)));
+	ImGui::Text("%s", GetBodyTypeDesc(GetBodyType(spawn.m_pSpawn)));
 	ImGui::TableNextColumn();
-	ImGui::Text("%s", spawn->GetRaceString());
+	ImGui::Text("%s", spawn.m_pSpawn->GetRaceString());
 	ImGui::TableNextColumn();
-	ImGui::Text("%s", spawn->GetClassString());
+	ImGui::Text("%s", spawn.m_pSpawn->GetClassString());
 	if (filters.directionArrow)
 	{
 		ImGui::TableNextColumn();
-		drawDirectionalArrow(spawn, ImGui::GetCursorScreenPos());
+		drawDirectionalArrow(spawn.m_pSpawn, ImGui::GetCursorScreenPos());
 	}
 }
 

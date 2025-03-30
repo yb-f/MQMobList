@@ -9,70 +9,14 @@
 #include <shared_mutex>
 
 PreSetup("MQMobList");
-PLUGIN_VERSION(0.1);
+PLUGIN_VERSION(0.2);
 
-std::vector<SPAWNINFO*> spawnList;
+SpawnList spawnList;
+bool bZoning = false;
+bool bFullRefresh = true;
+uint32_t bmMobListRefresh;
 
 Filters filters;
-
-bool matchFilter(std::string_view value, std::string_view filter, bool reverseFilter)
-{
-	if (filter.empty()) return true;
-
-	bool isMatch = (ci_find_substr(value, filter) != -1);
-
-	return reverseFilter ? !isMatch : isMatch;
-}
-
-/**
- * /brief Performs comparisons for all filters against a given spawn
- * 
- * This filter checks a series of filters (distance, name, class, race, body type) against a given spawn.
- * If any of the matches are failed the spawn is invalid and we return false.
- * 
- * \param pSpawn A pointer to the spawn object that is being checked
- * \return Returns true if all filters are matched, or false if not.
- */
-bool matchAllFilters(SPAWNINFO* pSpawn)
-{
-	if (pSpawn == nullptr)
-		return false;
-	
-	/// Compare spawn type of pSpawn with our filter.
-	if (GetSpawnType(pSpawn) != filters.spawnTypeNames[filters.typeSelection].second)
-		return false;
-
-	float distSquared = Get3DDistanceSquared(pSpawn->X, pSpawn->Y, pSpawn->Z, pLocalPlayer->X, pLocalPlayer->Y, pLocalPlayer->Z);
-	/// Compare dist^2 against minDist^2 and maxDist^2
-	if (distSquared < filters.minDistance * filters.minDistance || distSquared > filters.maxDistance * filters.maxDistance)
-		return false;
-
-	if (filters.name[0] != '\0' && !matchFilter(pSpawn->DisplayedName, filters.name, filters.nameReverse))
-	{
-		/// fail name check
-		return false;
-	}
-
-	if (filters.className[0] != '\0' && !matchFilter(pSpawn->GetClassString(), filters.className, filters.classReverse))
-	{
-		/// fail class name check
-		return false;
-	}
-
-	if (filters.raceName[0] != '\0' && !matchFilter(pSpawn->GetRaceString(), filters.raceName, filters.raceReverse))
-	{
-		/// fail race name check
-		return false;
-	}
-
-	if (filters.bodyType[0] != '\0' && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), filters.bodyType, filters.bodyReverse))
-	{
-		/// fail body type check
-		return false;
-	}
-	/// Spawn matches all filters
-	return true;
-}
 
 /**
  * /brief Generate a list of spawns matching the currently set filters
@@ -82,18 +26,15 @@ bool matchAllFilters(SPAWNINFO* pSpawn)
  */
 void createSpawnList()
 {
-	spawnList.clear();
+	spawnList.Clear();
 	SPAWNINFO* pSpawn = pSpawnList;
 	while (pSpawn)
 	{
-		if (matchAllFilters(pSpawn))
-		{
-			/// filters matched, add spawn to spawn list.
-			spawnList.emplace_back(pSpawn);
-		}
+		spawnList.AddSpawn(pSpawn);
+		SpawnObject& pSpawnObject = spawnList.GetSpawn(pSpawn);
+		spawnList.matchAllFilters(pSpawnObject, filters);
 		pSpawn = pSpawn->pNext;
 	}
-	filters.refreshTriggered = true;
 }
 
 /**
@@ -151,7 +92,7 @@ void moblistCmd(PlayerClient* pChar, const char* szLine) {
 		}
 		if (ci_equals(arg, "reset"))
 		{
-			filters.resetFilters(filters);
+			filters.resetFilters();
 			return;
 		}
 	}
@@ -161,15 +102,23 @@ void moblistCmd(PlayerClient* pChar, const char* szLine) {
 	}
 }
 
+PLUGIN_API void OnBeginZone()
+{
+	spawnList.Clear();
+	// DebugSpewAlways("MQImMap::OnBeginZone()");
+}
+
+PLUGIN_API void OnEndZone()
+{
+	// DebugSpewAlways("MQImMap::OnEndZone()");
+}
+
 PLUGIN_API void InitializePlugin()
 {
 	DebugSpewAlways("MQMobList::Initializing version %f", MQ2Version);
-	if (GetGameState() == GAMESTATE_INGAME)
-	{
-		createSpawnList();
-	}
 	// Examples:
 	AddCommand("/moblist", moblistCmd);
+	bmMobListRefresh = AddMQ2Benchmark("Moblist Refresh ImGui");
 	// AddMQ2Data("mytlo", MyTLOData);
 }
 
@@ -192,9 +141,14 @@ PLUGIN_API void ShutdownPlugin()
  *
  * @param pNewSpawn PSPAWNINFO - The spawn that was added
  */
-PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
+PLUGIN_API void OnAddSpawn(PSPAWNINFO pSpawn)
 {
-	createSpawnList();
+	spawnList.AddSpawn(pSpawn);
+
+	// Retrieve the last added spawn to apply filters
+	SpawnObject& pSpawnObject = spawnList.GetSpawn(pSpawn);
+	spawnList.matchAllFilters(pSpawnObject, filters);
+	filters.spawnAdded = true;
 	// DebugSpewAlways("MQtest::OnAddSpawn(%s)", pNewSpawn->Name);
 }
 
@@ -211,7 +165,7 @@ PLUGIN_API void OnAddSpawn(PSPAWNINFO pNewSpawn)
  */
 PLUGIN_API void OnRemoveSpawn(PSPAWNINFO pSpawn)
 {
-	createSpawnList();
+	spawnList.RemoveSpawn(pSpawn);
 	// DebugSpewAlways("MQtest::OnRemoveSpawn(%s)", pSpawn->Name);
 }
 
@@ -226,24 +180,30 @@ PLUGIN_API void OnRemoveSpawn(PSPAWNINFO pSpawn)
 PLUGIN_API void OnZoned()
 {
 	// DebugSpewAlways("MQtest::OnZoned()");
-	createSpawnList();
+	///Lets handle this in onpulse instead
+	//createSpawnList();
 }
 
 PLUGIN_API void OnPulse()
 {
-	if (!filters.welcomeSent)
+	if (GetGameState() == GAMESTATE_INGAME)
 	{
-		filters.welcomeSent = true;
-		WriteChatf(PLUGIN_MSG "Welcome to MQ Mob List.");
-		WriteChatf(PLUGIN_MSG "Use \ay/moblist help\aw to show help.");
+		if (!filters.welcomeSent && GetGameState() == GAMESTATE_INGAME)
+		{
+			filters.welcomeSent = true;
+			WriteChatf(PLUGIN_MSG "Welcome to MQ Mob List.");
+			WriteChatf(PLUGIN_MSG "Use \ay/moblist help\aw to show help.");
+		}
 	}
-	// Run only after timer is up
+
 }
 
 PLUGIN_API void OnUpdateImGui()
 {
-	if (GetGameState() == GAMESTATE_INGAME)
+	if (GetGameState() == GAMESTATE_INGAME && !bZoning)
 	{
+		EnterMQ2Benchmark(bmMobListRefresh);
 		drawMobList(spawnList, filters);
+		ExitMQ2Benchmark(bmMobListRefresh);
 	}
 }
