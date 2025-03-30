@@ -28,7 +28,7 @@ To load the plugin:
 You may use the following commands:
 
 ```txt
-    /moblist help     -- Display help
+/moblist help     -- Display help
 /moblist show     -- Show the Mob List window
 /moblist hide     -- Hide the Mob List window
 /moblist refresh  -- Manually trigger refresh of spawn data
