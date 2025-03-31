@@ -27,7 +27,7 @@ public:
 	float debounceTimer = 0.0f;
 	const float debounceDelay = 0.2f;
 	/// Filters by Type
-	std::vector<std::pair<const char*, eSpawnType>> spawnTypeNames = {
+	static std::vector<std::pair<const char*, eSpawnType>> spawnTypeNames = {
 		{"None", NONE},
 		{"PC", PC},
 		{"Mount", MOUNT},
@@ -343,7 +343,7 @@ public:
 		return spawns.size();
 	}
 
-	size_t visibleSize() const {
+	int visibleSize() const {
 		int count = 0;
 		for (const SpawnObject& spawn : spawns) {
 			if (spawn.m_bDisplayed) {
