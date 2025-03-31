@@ -19,7 +19,7 @@ constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hidea
  * \param angle angle of the object we are drawing
  * \return the new location of the point
  */
-ImVec2 rotatePoint(ImVec2 point, float centerX, float centerY, float angle)
+ImVec2 rotatePoint(const ImVec2& point, float centerX, float centerY, float angle)
 {
 	float radians = angle * (PI / 180);
 	float sinA = sin(radians);
@@ -402,7 +402,7 @@ void drawMobListTable(SpawnList& spawnList, Filters& filters)
  * \param spawn The spawn to be displayed
  * \param filters Filters object
  */
-void drawMobRow(const SpawnObject& spawn, Filters& filters)
+void drawMobRow(const SpawnObject& spawn, const Filters& filters)
 {
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
@@ -502,7 +502,7 @@ void drawMobRow(const SpawnObject& spawn, Filters& filters)
  * \param spawn The spawn we are drawing for
  * \param cursorPos The current position of the cursor
  */
-void drawDirectionalArrow(PlayerClient* spawn, ImVec2 cursorPos)
+void drawDirectionalArrow(PlayerClient* spawn, const ImVec2& cursorPos)
 {
 	float angle = calculateRelativeAngleTo(spawn);
 	ImVec2 p1 = ImVec2(cursorPos.x + ARROW_SIZE / 2, cursorPos.y);
