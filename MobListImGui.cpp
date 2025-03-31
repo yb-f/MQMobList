@@ -7,6 +7,7 @@
 constexpr int ARROW_WIDTH = 5;
 constexpr int ARROW_HEIGHT = 15;
 constexpr int ARROW_SIZE = 25;
+constexpr float PI_F = 3.1415927f;
 constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
 	ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
 
@@ -21,7 +22,7 @@ constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hidea
  */
 ImVec2 rotatePoint(const ImVec2& point, float centerX, float centerY, float angle)
 {
-	float radians = angle * (PI / 180);
+	float radians = angle * (PI_F / 180);
 	float sinA = sin(radians);
 	float cosA = cos(radians);
 
