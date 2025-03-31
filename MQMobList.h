@@ -297,15 +297,15 @@ public:
 				case TableColumnID::Level:
 					return ascending ? spawnA->Level < spawnB->Level : spawnA->Level > spawnB->Level;
 				case TableColumnID::DisplayName: {
-					int cmp = stricmp(spawnA->DisplayedName, spawnB->DisplayedName);
+					int cmp = _stricmp(spawnA->DisplayedName, spawnB->DisplayedName);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Name: {
-					int cmp = stricmp(spawnA->Name, spawnB->Name);
+					int cmp = _stricmp(spawnA->Name, spawnB->Name);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Surname: {
-					int cmp = stricmp(spawnA->Lastname, spawnB->Lastname);
+					int cmp = _stricmp(spawnA->Lastname, spawnB->Lastname);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Distance: {
@@ -314,15 +314,15 @@ public:
 					return ascending ? distA < distB : distA > distB;
 				}
 				case TableColumnID::Body: {
-					int cmp = stricmp(GetBodyTypeDesc(GetBodyType(spawnA)), GetBodyTypeDesc(GetBodyType(spawnB)));
+					int cmp = _stricmp(GetBodyTypeDesc(GetBodyType(spawnA)), GetBodyTypeDesc(GetBodyType(spawnB)));
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Race: {
-					int cmp = stricmp(spawnA->GetRaceString(), spawnB->GetRaceString());
+					int cmp = _stricmp(spawnA->GetRaceString(), spawnB->GetRaceString());
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Class: {
-					int cmp = stricmp(spawnA->GetClassString(), spawnB->GetClassString());
+					int cmp = _stricmp(spawnA->GetClassString(), spawnB->GetClassString());
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				default:
