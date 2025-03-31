@@ -70,7 +70,7 @@ float calculateRelativeAngleTo(PlayerClient* spawn)
 {
 	float diffX = pLocalPlayer->X - spawn->X;
 	float diffY = pLocalPlayer->Y - spawn->Y;
-	float headingTo = atan2f(diffY, diffX) * 180.0f / PI + 90.0f;
+	float headingTo = atan2f(diffY, diffX) * 180.0f / PI_F + 90.0f;
 	if (headingTo < 0.0f) {
 		headingTo += 360.0f;
 	}
