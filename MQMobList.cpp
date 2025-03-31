@@ -29,9 +29,7 @@ void createSpawnList()
 	PlayerClient* pSpawn = pSpawnList;
 	while (pSpawn)
 	{
-		spawnList.AddSpawn(pSpawn);
-		SpawnObject& pSpawnObject = spawnList.GetSpawn(pSpawn);
-		spawnList.matchAllFilters(pSpawnObject, filters);
+		spawnList.AddSpawn(pSpawn, filters);
 		pSpawn = pSpawn->pNext;
 	}
 }
@@ -131,12 +129,7 @@ PLUGIN_API void ShutdownPlugin()
 
 PLUGIN_API void OnAddSpawn(PlayerClient* pSpawn)
 {
-	spawnList.AddSpawn(pSpawn);
-
-	// Retrieve the last added spawn to apply filters
-	SpawnObject& pSpawnObject = spawnList.GetSpawn(pSpawn);
-	spawnList.matchAllFilters(pSpawnObject, filters);
-	filters.spawnAdded = true;
+	spawnList.AddSpawn(pSpawn, filters);
 }
 
 PLUGIN_API void OnRemoveSpawn(PlayerClient* pSpawn)

@@ -179,8 +179,10 @@ private:
 	std::vector<SpawnObject> spawns;
 
 public:
-	void AddSpawn(PlayerClient* pSpawn) {
+	void AddSpawn(PlayerClient* pSpawn, Filters& filters) {
 		spawns.push_back(SpawnObject(pSpawn));
+		matchAllFilters(spawns.back(), filters);
+		filters.spawnAdded = true;
 	}
 
 	void RemoveSpawn(PlayerClient* pSpawn) {
@@ -190,18 +192,6 @@ public:
 		if (it != spawns.end()) {
 			spawns.erase(it);  // Removes the spawn from the list
 		}
-	}
-
-	SpawnObject& GetSpawn(PlayerClient* pSpawn)
-	{
-		for (auto& spawnObj : spawns)
-		{
-			if (spawnObj.m_pSpawn == pSpawn)
-			{
-				return spawnObj;
-			}
-		}
-		std::runtime_error("Spawn not found.");
 	}
 
 	void Clear() {
