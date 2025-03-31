@@ -27,7 +27,7 @@ public:
 	float debounceTimer = 0.0f;
 	const float debounceDelay = 0.2f;
 	/// Filters by Type
-	static std::vector<std::pair<const char*, eSpawnType>> spawnTypeNames = {
+	static inline std::vector<std::pair<const char*, eSpawnType>> spawnTypeNames = {
 		{"None", NONE},
 		{"PC", PC},
 		{"Mount", MOUNT},
