@@ -52,97 +52,75 @@ public:
 		{"NpcCorpse", NPCCORPSE},
 		{"PcCorpse", PCCORPSE},
 	};
-	eSpawnType typeSelection;
+	eSpawnType typeSelection = eSpawnType::NPC;
 	/// Filters by level 
-	int levelLow;
-	int levelHigh;
+	int levelLow = 1;
+	int levelHigh = 150;
 	/// Filters by name
 	std::string name;
-	bool nameReverse;
+	bool nameReverse = false;
 	/// Filters by distance
-	int minDistance;
-	int maxDistance;
+	int minDistance = 0;
+	int maxDistance = 10000;
 	/// Filters by body type
 	std::string bodyType;
-	bool bodyReverse;
+	bool bodyReverse = false;
 	/// Filters by race	
 	std::string raceName;
-	bool raceReverse;
+	bool raceReverse = false;
 	/// Filters by class
 	std::string className;
-	bool classReverse;
+	bool classReverse = false;
 	/// UI Settings
 	bool conColor = true;
 	bool directionArrow = false;
 	bool showMobListWindow = false;
 	/// Theme Settings
-	int playerWinThemeId;
-	bool roundPlayerWin;
-	bool drawPicker;
+	int playerWinThemeId = 10;
+	bool roundPlayerWin = false;
+	bool drawPicker = false;
 	/// Sort triggers
 	unsigned int prevColumn = -1;
 	bool prevAscending = true;
 	bool spawnAdded = false;
 	bool welcomeSent = false;
 	/// Server Type
-	int serverType;
+	int serverType = gBuild;
 
-	Filters() {
-		levelLow = 1;
-		levelHigh = 150;
-		name = "";
-		nameReverse = false;
-		minDistance = 0;
-		maxDistance = 10000;
-		typeSelection = eSpawnType::NPC;
-		bodyType = "";
-		bodyReverse = false;
-		raceName = "";
-		raceReverse = false;
-		className = "";
-		classReverse = false;
-		conColor = true;
-		directionArrow = false;
-		serverType = gBuild;
-		//temp til i consider putting in settings persitance
-		playerWinThemeId = 10;
-		roundPlayerWin = false;
-		drawPicker = false;
-	}
+	Filters() {}
 	
 	void resetFilters()
 	{
 		levelLow = 1;
 		levelHigh = 150;
-		name = "";
+		name.clear();
 		nameReverse = false;
 		minDistance = 0;
 		maxDistance = 10000;
 		typeSelection = eSpawnType::NPC;
-		bodyType = "";
+		bodyType.clear();
 		bodyReverse = false;
-		raceName = "";
+		raceName.clear();
 		raceReverse = false;
-		className = "";
+		className.clear();
 		classReverse = false;
 	}
 };
 
 class SpawnObject {
 public:
-	PlayerClient* m_pSpawn; //pointer to the spawn
-	bool m_bDisplayed; // should this spawn be displayed
-	bool m_bFiltersMismatch; // Does this match the selected filters
-	bool m_bDistanceMismatch;  // Is this within the selected distance
-	float m_fDistance; //Calculated distance to spawn SQUARED
+	PlayerClient* m_pSpawn = nullptr; //pointer to the spawn
+	bool m_bDisplayed = false; // should this spawn be displayed
+	bool m_bFiltersMismatch = false; // Does this match the selected filters
+	bool m_bDistanceMismatch = false;  // Is this within the selected distance
+	float m_fDistanceSq = 0.0f; //Calculated distance to spawn SQUARED
 
 	SpawnObject(PlayerClient* pSpawn)
-		: m_pSpawn(pSpawn), m_bDisplayed(false), m_fDistance(0.0f), 
-		m_bDistanceMismatch(false), m_bFiltersMismatch(false) {}
+		: m_pSpawn(pSpawn) {}
 
 	void UpdateDistance(float x, float y, float z) {
 		if (m_pSpawn) {
-			m_fDistance = Get3DDistanceSquared(m_pSpawn->X, m_pSpawn->Y, m_pSpawn->Z, x, y, z);
+			m_fDistanceSq = Get3DDistanceSquared(m_pSpawn->X, m_pSpawn->Y, m_pSpawn->Z, x, y, z);
 		}
 	}
 
@@ -150,7 +128,7 @@ public:
 		float maxDistSq = static_cast<float>(filters.maxDistance) * filters.maxDistance;
 		float minDistSq = static_cast<float>(filters.minDistance) * filters.minDistance;
 
-		return (m_fDistance >= minDistSq && m_fDistance <= maxDistSq);
+		return (m_fDistanceSq >= minDistSq && m_fDistanceSq <= maxDistSq);
 	}
 
 	void UpdateDistanceFlag(const Filters& filters) {
@@ -170,7 +148,7 @@ public:
 	}
 
 	float GetDisplayDistance() const {
-		return sqrtf(m_fDistance);
+		return sqrtf(m_fDistanceSq);
 	}
 };
 
@@ -219,21 +197,21 @@ public:
 		{
 			nonDistMismatch = true;
 		}
-		else if (filters.name[0] != '\0' &&
+		else if (!filters.name.empty() &&
 			!matchFilter(pSpawn->DisplayedName, filters.name, filters.nameReverse) &&
 			!matchFilter(pSpawn->Name, filters.name, filters.nameReverse))
 		{
 			nonDistMismatch = true;
 		}
-		else if (filters.raceName[0] != '\0' && !matchFilter(pSpawn->GetRaceString(), filters.raceName, filters.raceReverse))
+		else if (!filters.raceName.empty() && !matchFilter(pSpawn->GetRaceString(), filters.raceName, filters.raceReverse))
 		{
 			nonDistMismatch = true;
 		}
-		else if (filters.className[0] != '\0' && !matchFilter(pSpawn->GetClassString(), filters.className, filters.classReverse))
+		else if (!filters.className.empty() && !matchFilter(pSpawn->GetClassString(), filters.className, filters.classReverse))
 		{
 			nonDistMismatch = true;
 		}
-		else if (filters.bodyType[0] != '\0' && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), filters.bodyType, filters.bodyReverse))
+		else if (!filters.bodyType.empty() && !matchFilter(GetBodyTypeDesc(GetBodyType(pSpawn)), filters.bodyType, filters.bodyReverse))
 		{
 			nonDistMismatch = true;
 		}
@@ -287,15 +265,15 @@ public:
 				case TableColumnID::Level:
 					return ascending ? spawnA->Level < spawnB->Level : spawnA->Level > spawnB->Level;
 				case TableColumnID::DisplayName: {
-					int cmp = _stricmp(spawnA->DisplayedName, spawnB->DisplayedName);
+					int cmp = ci_string_compare(spawnA->DisplayedName, spawnB->DisplayedName);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Name: {
-					int cmp = _stricmp(spawnA->Name, spawnB->Name);
+					int cmp = ci_string_compare(spawnA->Name, spawnB->Name);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Surname: {
-					int cmp = _stricmp(spawnA->Lastname, spawnB->Lastname);
+					int cmp = ci_string_compare(spawnA->Lastname, spawnB->Lastname);
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Distance: {
@@ -304,15 +282,15 @@ public:
 					return ascending ? distA < distB : distA > distB;
 				}
 				case TableColumnID::Body: {
-					int cmp = _stricmp(GetBodyTypeDesc(GetBodyType(spawnA)), GetBodyTypeDesc(GetBodyType(spawnB)));
+					int cmp = ci_string_compare(GetBodyTypeDesc(GetBodyType(spawnA)), GetBodyTypeDesc(GetBodyType(spawnB)));
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Race: {
-					int cmp = _stricmp(spawnA->GetRaceString(), spawnB->GetRaceString());
+					int cmp = ci_string_compare(spawnA->GetRaceString(), spawnB->GetRaceString());
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				case TableColumnID::Class: {
-					int cmp = _stricmp(spawnA->GetClassString(), spawnB->GetClassString());
+					int cmp = ci_string_compare(spawnA->GetClassString(), spawnB->GetClassString());
 					return ascending ? cmp < 0 : cmp > 0;
 				}
 				default:
@@ -351,3 +329,10 @@ public:
 };
 
 void createSpawnList();
+
+void drawMobList(SpawnList& spawnList, Filters& filters);
+void drawMenu(Filters& filters);
+void drawSearchHeader(Filters& filters, SpawnList& spawnList);
+void drawMobListTable(SpawnList& spawnList, Filters& filters);
+void drawMobRow(const SpawnObject& spawn, const Filters& filters);
+void drawDirectionalArrow(PlayerClient* spawn, const ImVec2& cursorPos);

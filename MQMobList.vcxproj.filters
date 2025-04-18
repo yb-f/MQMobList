@@ -23,9 +23,6 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MobListImGui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MQMobList.h">
       <Filter>Header Files</Filter>
     </ClInclude>

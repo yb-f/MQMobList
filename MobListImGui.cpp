@@ -1,15 +1,15 @@
-#include "MobListImGui.h"
-#include "imgui/fonts/IconsMaterialDesign.h"
-#include <cmath>
-#include <imgui/misc/cpp/imgui_stdlib.h>
+#include "MQMobList.h"
 #include "Theme.h"
+#include "imgui/fonts/IconsMaterialDesign.h"
+#include <imgui/misc/cpp/imgui_stdlib.h>
+#include <cmath>
 
 constexpr int ARROW_WIDTH = 5;
 constexpr int ARROW_HEIGHT = 15;
 constexpr int ARROW_SIZE = 25;
 constexpr float PI_F = 3.1415927f;
-constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | 
-	ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
+constexpr int TABLE_FLAGS = (ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+	ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY);
 
 /**
  * \brief Rotate point based off center points and angle
@@ -125,17 +125,17 @@ void drawMenu(Filters& filters)
 	{
 		if (ImGui::BeginMenu("Settings"))
 		{
-			if (ImGui::MenuItem("Show Con Colors", NULL, filters.conColor))
+			if (ImGui::MenuItem("Show Con Colors", nullptr, filters.conColor))
 			{
 				filters.conColor = !filters.conColor;
 				WriteChatf(PLUGIN_MSG "Show Con Colors is now \ag%s", filters.conColor ? "enabled" : "disabled");
 			}
-			if (ImGui::MenuItem("Show Directional Arrow", NULL, filters.directionArrow))
+			if (ImGui::MenuItem("Show Directional Arrow", nullptr, filters.directionArrow))
 			{
 				filters.directionArrow = !filters.directionArrow;
 				WriteChatf(PLUGIN_MSG "Show Directional Arrow is now \ag%s", filters.directionArrow ? "enabled" : "disabled");
 			}
-			if (ImGui::MenuItem("Select Theme", NULL, filters.drawPicker))
+			if (ImGui::MenuItem("Select Theme", nullptr, filters.drawPicker))
 			{
 				filters.drawPicker = !filters.drawPicker;
 			}
@@ -405,20 +405,22 @@ void drawMobListTable(SpawnList& spawnList, Filters& filters)
  */
 void drawMobRow(const SpawnObject& spawn, const Filters& filters)
 {
+	char label[32];
+	sprintf_s(label, "%d", spawn.m_pSpawn->SpawnID);
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
-	ImGui::Selectable(std::to_string(spawn.m_pSpawn->SpawnID).c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
+	ImGui::Selectable(label, false, ImGuiSelectableFlags_SpanAllColumns);
 	if (ImGui::IsItemHovered())
 	{
 		if (filters.serverType == 4)
 		{
 			ImGui::SetTooltip("Left click to target\nCtrl + left click to navigate self\nCtrl + Shift + left click to navigate group\nRight click to highlight\nCtrl + right click to search mob on allakhazam");	
-			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 			{
 				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn.m_pSpawn->DisplayedName);
 				DoCommandf("/highlight \"%s\"", spawn.m_pSpawn->DisplayedName);
 			}
-			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
 				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl) && ImGui::IsKeyDown(ImGuiKey_ModShift))
 				{
@@ -439,12 +441,12 @@ void drawMobRow(const SpawnObject& spawn, const Filters& filters)
 		}
 		else {
 			ImGui::SetTooltip("Right click to highlight\nLeft click to navigate self\nCtrl + left click to navigate group");
-			if (ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
 			{
 				WriteChatf(PLUGIN_MSG "Highlighting mobs named \ar%s", spawn.m_pSpawn->DisplayedName);
 				DoCommandf("/highlight \"%s\"", spawn.m_pSpawn->DisplayedName);
 			}
-			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 			{
 				if (ImGui::IsKeyDown(ImGuiKey_ModCtrl))
 				{
@@ -464,7 +466,7 @@ void drawMobRow(const SpawnObject& spawn, const Filters& filters)
 	ImGui::TableNextColumn();
 	if (filters.conColor)
 	{
-		auto color = getConColor(spawn.m_pSpawn);
+		auto color = GetColorForChatColor(ConColor(spawn.m_pSpawn)).ToImColor();
 		ImGui::TextColored(color, "%s", spawn.m_pSpawn->DisplayedName);
 		ImGui::TableNextColumn();
 		ImGui::TextColored(color, "%s", spawn.m_pSpawn->Name);
@@ -480,7 +482,7 @@ void drawMobRow(const SpawnObject& spawn, const Filters& filters)
 	ImGui::Text("%s", spawn.m_pSpawn->Lastname);
 	ImGui::TableNextColumn();
 	//calculate distance to spawn
-	ImGui::Text("%.1f", sqrt(spawn.m_fDistance));
+	ImGui::Text("%.1f", sqrt(spawn.m_fDistanceSq));
 	ImGui::TableNextColumn();
 	ImGui::Text("%.1f, %.1f, %.1f", spawn.m_pSpawn->Y, spawn.m_pSpawn->X, spawn.m_pSpawn->Z);
 	ImGui::TableNextColumn();

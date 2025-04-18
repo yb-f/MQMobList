@@ -2,11 +2,8 @@
 // MQMobList.cpp : Defines the entry point for the DLL application.
 //
 
-#include <mq/Plugin.h>
-
-#include "MobListImGui.h"
 #include "MQMobList.h"
-#include <shared_mutex>
+#include <mq/Plugin.h>
 
 PreSetup("MQMobList");
 PLUGIN_VERSION(0.2);
@@ -86,6 +83,7 @@ void moblistCmd(PlayerClient* pChar, const char* szLine) {
 		if (ci_equals(arg, "refresh"))
 		{
 			createSpawnList();
+			return;
 		}
 		if (ci_equals(arg, "reset"))
 		{

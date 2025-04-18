@@ -77,7 +77,6 @@
     <ClCompile Include="MQMobList.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MobListImGui.h" />
     <ClInclude Include="MQMobList.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Theme.h" />
